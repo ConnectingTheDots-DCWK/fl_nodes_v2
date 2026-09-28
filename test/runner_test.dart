@@ -807,7 +807,7 @@ void main() {
       );
     });
 
-    test('a context kept past its turn refuses to write', () async {
+    test('a context kept past its turn refuses to write, and to log', () async {
       NodeExecutionContext? stashed;
       final controller = controllerWith(
         <GraphNode>[
@@ -826,6 +826,7 @@ void main() {
 
       await controller.runner.run();
 
+      // Both writes go through the same `_requireOpen` guard.
       expect(
         () => stashed!.emit('out', 'too late'),
         throwsStateError,
@@ -833,6 +834,7 @@ void main() {
             'an unawaited future inside an executor would otherwise '
             "scribble into a later node's inputs",
       );
+      expect(() => stashed!.log('too late'), throwsStateError);
     });
   });
 
@@ -1257,21 +1259,6 @@ void main() {
         recorder.events.indexWhere((e) => e is LogEmitted),
         lessThan(recorder.events.indexWhere((e) => e is NodeFinished)),
       );
-    });
-
-    test('a context kept past its turn refuses to log', () async {
-      NodeExecutionContext? stashed;
-      final controller = controllerWith(
-        <GraphNode>[
-          node('a', 'keep', <NodePort>[controlOut()]),
-        ],
-        const <NodeConnection>[],
-        <NodePrototype>[step('keep', onExecute: (c) async => stashed = c)],
-      );
-
-      await controller.runner.run();
-
-      expect(() => stashed!.log('too late'), throwsStateError);
     });
 
     test(
