@@ -441,40 +441,29 @@ void main() {
       );
     });
 
-    testWidgets('the frame itself takes no clicks', (tester) async {
-      final controller = await pump(tester);
-      controller.selection.selectNodes(<String>['a', 'b']);
-      controller.groupSelection();
-      controller.selection.clear();
-      await tester.pumpAndSettle();
+    testWidgets(
+      'the frame itself takes no clicks, and paints below its own members',
+      (tester) async {
+        final controller = await pump(tester);
+        controller.selection.selectNodes(<String>['a', 'b']);
+        controller.groupSelection();
+        controller.selection.clear();
+        await tester.pumpAndSettle();
+        final origin = tester.getTopLeft(find.byType(NodeEditor));
 
-      // Between the two nodes, well inside the frame and clear of the handle.
-      final origin = tester.getTopLeft(find.byType(NodeEditor));
-      await tester.tapAt(origin + const Offset(320, 160));
-      await tester.pumpAndSettle();
+        // Between the two nodes, well inside the frame and clear of the
+        // handle: the space inside a frame is still canvas.
+        await tester.tapAt(origin + const Offset(320, 160));
+        await tester.pumpAndSettle();
+        expect(controller.selection.isEmpty, isTrue);
 
-      expect(
-        controller.selection.isEmpty,
-        isTrue,
-        reason: 'the space inside a frame is still canvas',
-      );
-    });
-
-    testWidgets('a frame paints below its own members', (tester) async {
-      final controller = await pump(tester);
-      controller.selection.selectNodes(<String>['a', 'b']);
-      controller.groupSelection();
-      controller.selection.clear();
-      await tester.pumpAndSettle();
-
-      // Clicking a node inside the frame does what it always did.
-      final origin = tester.getTopLeft(find.byType(NodeEditor));
-      await tester.tapAt(origin + const Offset(180, 140));
-      await tester.pumpAndSettle();
-
-      expect(controller.selection.nodeIds, <String>{'a'});
-      expect(controller.selection.groupIds, isEmpty);
-    });
+        // Clicking a node inside the frame does what it always did.
+        await tester.tapAt(origin + const Offset(180, 140));
+        await tester.pumpAndSettle();
+        expect(controller.selection.nodeIds, <String>{'a'});
+        expect(controller.selection.groupIds, isEmpty);
+      },
+    );
 
     /// A stranger lying across a group's member, so paint order is the only
     /// thing deciding which of the two you can click.

@@ -220,34 +220,25 @@ void main() {
     expect(controller.graph.connections, hasLength(1));
   });
 
-  testWidgets('and goes when the menu is dismissed', (tester) async {
-    final controller = await boot(
-      tester,
-      menus: const NodeEditorMenus(createOnDrop: true),
-    );
+  testWidgets(
+    'Escape dismisses the menu, and goes with the wire, leaving the graph '
+    'untouched',
+    (tester) async {
+      final controller = await boot(
+        tester,
+        menus: const NodeEditorMenus(createOnDrop: true),
+      );
 
-    await dropWire(tester, controller, const Offset(420, 400));
-    expect(pendingWire(tester), isNotNull);
+      await dropWire(tester, controller, const Offset(420, 400));
+      expect(pendingWire(tester), isNotNull);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
 
-    expect(pendingWire(tester), isNull);
-    expect(controller.graph.connections, isEmpty);
-  });
-
-  testWidgets('dismissing the menu leaves the graph alone', (tester) async {
-    final controller = await boot(
-      tester,
-      menus: const NodeEditorMenus(createOnDrop: true),
-    );
-
-    await dropWire(tester, controller, const Offset(420, 400));
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-
-    expect(controller.graph.nodes, hasLength(1));
-    expect(controller.graph.connections, isEmpty);
-    expect(controller.history.canUndo, isFalse);
-  });
+      expect(pendingWire(tester), isNull);
+      expect(controller.graph.nodes, hasLength(1));
+      expect(controller.graph.connections, isEmpty);
+      expect(controller.history.canUndo, isFalse);
+    },
+  );
 }

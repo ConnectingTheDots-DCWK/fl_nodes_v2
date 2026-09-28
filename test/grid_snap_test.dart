@@ -127,15 +127,23 @@ void main() {
   }
 
   group('GridSnap', () {
-    test('rounds to the nearest line, not down to it', () {
-      expect(GridSnap.axis(13, spacing), 24);
-      expect(GridSnap.axis(11, spacing), 0);
-      expect(GridSnap.axis(36, spacing), 48, reason: 'a half goes outward');
-    });
-
-    test('is symmetric about the origin', () {
-      expect(GridSnap.axis(-13, spacing), -24);
-      expect(GridSnap.axis(-36, spacing), -48);
+    test('the arithmetic', () {
+      const unsnapped = Offset(13.7, -2.5);
+      const mixed = Offset(13, 35);
+      const snapped = Offset(24, 24);
+      for (final (reason, actual, expected) in <(String, Object?, Object?)>[
+        ('rounds up', GridSnap.axis(13, spacing), 24),
+        ('rounds down', GridSnap.axis(11, spacing), 0),
+        ('a half goes outward', GridSnap.axis(36, spacing), 48),
+        ('symmetric, negative', GridSnap.axis(-13, spacing), -24),
+        ('symmetric, more negative', GridSnap.axis(-36, spacing), -48),
+        ('zero step is the identity', GridSnap.axis(13.7, 0), 13.7),
+        ('negative step is the identity', GridSnap.axis(13.7, -5), 13.7),
+        ('zero step, offset too', GridSnap.offset(unsnapped, 0), unsnapped),
+        ('axes snap independently', GridSnap.offset(mixed, spacing), snapped),
+      ]) {
+        expect(actual, expected, reason: reason);
+      }
     });
 
     test('never hands back a negative zero', () {
@@ -147,22 +155,6 @@ void main() {
         reason:
             '-0.0 compares equal to 0.0 and then serialises as itself, '
             'so a document would carry it out to disk',
-      );
-    });
-
-    test('a step of zero or less is the identity', () {
-      expect(GridSnap.axis(13.7, 0), 13.7);
-      expect(GridSnap.axis(13.7, -5), 13.7);
-      expect(
-        GridSnap.offset(const Offset(13.7, -2.5), 0),
-        const Offset(13.7, -2.5),
-      );
-    });
-
-    test('snaps the two axes independently', () {
-      expect(
-        GridSnap.offset(const Offset(13, 35), spacing),
-        const Offset(24, 24),
       );
     });
   });
