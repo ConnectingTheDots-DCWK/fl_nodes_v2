@@ -1,4 +1,5 @@
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -78,40 +79,111 @@ void main() {
   });
 
   group('port tooltips', () {
-    NodePort portOf(String id, PortKind kind) => NodePort.input(
-      id: id,
-      label: id,
-      kind: kind,
-      anchor: const Offset(0, 0.5),
+    // Driven through NodeEditor.portTooltip and a real hover, not the
+    // callback in isolation: these used to pin a contract the widget never
+    // exercised, leaving the actual hover-to-label path untested.
+    final NodeEditorTheme theme = NodeEditorTheme.dark();
+
+    GraphNode node() => GraphNode(
+      id: 'n',
+      type: 't',
+      position: const Offset(100, 100),
+      width: 160,
+      height: 90,
+      ports: const <NodePort>[
+        NodePort.input(id: 'exec', kind: PortKind.control),
+        NodePort.input(id: 'value', kind: PortKind.data),
+      ],
     );
 
-    testWidgets('nothing is shown until the host is asked', (tester) async {
-      // No `portTooltip` is the default, and a canvas with none draws no
-      // label however long the pointer rests.
+    Future<NodeEditorController> boot(
+      WidgetTester tester, {
+      String? Function(GraphNode, NodePort)? portTooltip,
+    }) async {
+      final controller = NodeEditorController(
+        graph: NodeGraph(nodes: <GraphNode>[node()]),
+      );
+      addTearDown(controller.dispose);
       await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: SizedBox())),
+        MaterialApp(
+          home: Scaffold(
+            body: NodeEditor(
+              controller: controller,
+              theme: theme,
+              portTooltip: portTooltip,
+              nodeBuilder: (context, graphNode, state) =>
+                  const ColoredBox(color: Color(0xFF2A2E38)),
+            ),
+          ),
+        ),
       );
-      expect(find.byType(Tooltip), findsNothing);
-    });
+      await tester.pumpAndSettle();
+      return controller;
+    }
 
-    test('a host may label the ports worth labelling and skip the rest', () {
-      // The contract the editor reads: null and empty both mean "say
-      // nothing", so a host can answer for one port and not another without
-      // building a map of the ones it wants.
-      String? ask(GraphNode node, NodePort port) =>
-          port.kind == PortKind.data ? 'anything' : null;
+    Offset screenPoint(
+      WidgetTester tester,
+      NodeEditorController controller,
+      Offset scenePoint,
+    ) =>
+        tester.getTopLeft(find.byType(NodeEditor)) +
+        controller.camera.viewport.toScreen(scenePoint);
 
-      final node = GraphNode(
-        id: 'n',
-        type: 't',
-        position: Offset.zero,
-        ports: <NodePort>[
-          portOf('exec', PortKind.control),
-          portOf('value', PortKind.data),
-        ],
+    testWidgets(
+      'hovering the port the host labels shows the label; one it declines '
+      'shows nothing',
+      (tester) async {
+        final controller = await boot(
+          tester,
+          portTooltip: (node, port) => port.id == 'value' ? 'A number' : null,
+        );
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: Offset.zero);
+        addTearDown(mouse.removePointer);
+
+        await mouse.moveTo(
+          screenPoint(
+            tester,
+            controller,
+            controller.layout.portPosition(const PortRef('n', 'value'))!,
+          ),
+        );
+        await tester.pump();
+        expect(find.text('A number'), findsOneWidget);
+
+        // Nothing else in this tree writes a Text widget, so its absence
+        // here is the null-return case actually showing nothing rather than
+        // the earlier label simply lingering.
+        await mouse.moveTo(
+          screenPoint(
+            tester,
+            controller,
+            controller.layout.portPosition(const PortRef('n', 'exec'))!,
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(Text), findsNothing);
+      },
+    );
+
+    testWidgets('with no portTooltip at all, a hovered port shows nothing', (
+      tester,
+    ) async {
+      final controller = await boot(tester);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+
+      await mouse.moveTo(
+        screenPoint(
+          tester,
+          controller,
+          controller.layout.portPosition(const PortRef('n', 'value'))!,
+        ),
       );
-      expect(ask(node, node.portById('exec')!), isNull);
-      expect(ask(node, node.portById('value')!), 'anything');
+      await tester.pump();
+
+      expect(find.byType(Text), findsNothing);
     });
   });
 }

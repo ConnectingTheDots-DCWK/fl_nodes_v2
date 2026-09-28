@@ -90,7 +90,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('right-dragging off a port creates no wire', (tester) async {
+  testWidgets('right-dragging off a port creates no wire; left still does', (
+    tester,
+  ) async {
+    // Before the button filter this straddled the arena and a right-press
+    // over a handle started a real wire.
     var dropped = 0;
     final controller = await boot(
       tester,
@@ -103,7 +107,6 @@ void main() {
       portPoint(tester, controller, const PortRef('b', 'in')),
       buttons: kSecondaryButton,
     );
-
     expect(controller.graph.connections, isEmpty);
     expect(
       dropped,
@@ -112,10 +115,6 @@ void main() {
           'a right-press must not start a wire at all, so there is no '
           'in-flight connection left to drop',
     );
-  });
-
-  testWidgets('left-dragging off a port still creates a wire', (tester) async {
-    final controller = await boot(tester);
 
     await dragWith(
       tester,
@@ -123,11 +122,12 @@ void main() {
       portPoint(tester, controller, const PortRef('b', 'in')),
       buttons: kPrimaryButton,
     );
-
     expect(controller.graph.connections, hasLength(1));
   });
 
-  testWidgets('right-dragging the canvas sweeps no marquee', (tester) async {
+  testWidgets('right-dragging the canvas sweeps no marquee; left still does', (
+    tester,
+  ) async {
     final controller = await boot(tester);
 
     await dragWith(
@@ -136,8 +136,15 @@ void main() {
       screenPoint(tester, controller, const Offset(640, 430)),
       buttons: kSecondaryButton,
     );
-
     expect(controller.selection.nodeIds, isEmpty);
+
+    await dragWith(
+      tester,
+      screenPoint(tester, controller, const Offset(60, 60)),
+      screenPoint(tester, controller, const Offset(640, 430)),
+      buttons: kPrimaryButton,
+    );
+    expect(controller.selection.nodeIds, <String>{'a', 'b'});
   });
 
   testWidgets('right-dragging the canvas does not pan it', (tester) async {
@@ -160,54 +167,34 @@ void main() {
     );
   });
 
-  testWidgets('left-dragging the canvas still sweeps a marquee', (
-    tester,
-  ) async {
-    final controller = await boot(tester);
+  testWidgets(
+    'right-dragging a node neither moves it nor records history; left still '
+    'moves it',
+    (tester) async {
+      final controller = await boot(tester);
+      final before = controller.graph.nodes['a']!.position;
 
-    await dragWith(
-      tester,
-      screenPoint(tester, controller, const Offset(60, 60)),
-      screenPoint(tester, controller, const Offset(640, 430)),
-      buttons: kPrimaryButton,
-    );
+      await dragWith(
+        tester,
+        screenPoint(tester, controller, const Offset(200, 165)),
+        screenPoint(tester, controller, const Offset(320, 260)),
+        buttons: kSecondaryButton,
+      );
+      expect(controller.graph.nodes['a']!.position, before);
+      expect(
+        controller.history.canUndo,
+        isFalse,
+        reason: 'the drag opened no transaction, so there is nothing to undo',
+      );
 
-    expect(controller.selection.nodeIds, <String>{'a', 'b'});
-  });
-
-  testWidgets('right-dragging a node neither moves it nor records history', (
-    tester,
-  ) async {
-    final controller = await boot(tester);
-    final before = controller.graph.nodes['a']!.position;
-
-    await dragWith(
-      tester,
-      screenPoint(tester, controller, const Offset(200, 165)),
-      screenPoint(tester, controller, const Offset(320, 260)),
-      buttons: kSecondaryButton,
-    );
-
-    expect(controller.graph.nodes['a']!.position, before);
-    expect(
-      controller.history.canUndo,
-      isFalse,
-      reason: 'the drag opened no transaction, so there is nothing to undo',
-    );
-  });
-
-  testWidgets('left-dragging a node still moves it', (tester) async {
-    final controller = await boot(tester);
-    final before = controller.graph.nodes['a']!.position;
-
-    await dragWith(
-      tester,
-      screenPoint(tester, controller, const Offset(200, 165)),
-      screenPoint(tester, controller, const Offset(320, 260)),
-      buttons: kPrimaryButton,
-    );
-
-    expect(controller.graph.nodes['a']!.position, isNot(before));
-    expect(controller.history.canUndo, isTrue);
-  });
+      await dragWith(
+        tester,
+        screenPoint(tester, controller, const Offset(200, 165)),
+        screenPoint(tester, controller, const Offset(320, 260)),
+        buttons: kPrimaryButton,
+      );
+      expect(controller.graph.nodes['a']!.position, isNot(before));
+      expect(controller.history.canUndo, isTrue);
+    },
+  );
 }

@@ -74,7 +74,8 @@ void main() {
       expect(segments.map((s) => s.end), <Offset>[...via, to]);
     });
 
-    test('the join at a waypoint is smooth', () {
+    test('the join at a waypoint is smooth, and the ends still leave and '
+        'arrive along their port normals', () {
       const via = <Offset>[Offset(300, 260)];
       final segments = ConnectionPath.segments(from, to, via: via);
       final w = via.single;
@@ -88,11 +89,7 @@ void main() {
         arriving.dx * leaving.dx + arriving.dy * leaving.dy,
         greaterThan(0),
       );
-    });
 
-    test('the ends still leave and arrive along their port normals', () {
-      const via = <Offset>[Offset(300, 260)];
-      final segments = ConnectionPath.segments(from, to, via: via);
       expect(segments.first.c1.dy, from.dy);
       expect(segments.first.c1.dx, greaterThan(from.dx));
       expect(segments.last.c2.dy, to.dy);

@@ -127,12 +127,21 @@ void main() {
       );
     });
 
-    test('a layout that names nobody changes nothing', () {
+    test('reports nothing when a layout names nobody or leaves it where it '
+        'already is', () {
       final controller = controllerWith(<GraphNode>[node('a')]);
 
       expect(
         controller.applyLayout((graph, sizeOf) => const <String, Offset>{}),
         isFalse,
+        reason: 'a layout that names nobody',
+      );
+      expect(
+        controller.applyLayout(
+          (graph, sizeOf) => <String, Offset>{'a': Offset.zero},
+        ),
+        isFalse,
+        reason: 'a layout placing everything where it already is',
       );
     });
 
@@ -150,17 +159,6 @@ void main() {
         controller.graph.nodes['b']!.position,
         const Offset(7, 9),
         reason: 'arranging a selection is just a smaller map',
-      );
-    });
-
-    test('placing everything where it already is reports nothing', () {
-      final controller = controllerWith(<GraphNode>[node('a')]);
-
-      expect(
-        controller.applyLayout(
-          (graph, sizeOf) => <String, Offset>{'a': Offset.zero},
-        ),
-        isFalse,
       );
     });
 

@@ -97,11 +97,13 @@ void main() {
             node('a', type: 'documented'),
             node('b', type: 'bare'),
             node('c', type: 'unregistered'),
+            node('d', type: 'blank'),
           ],
         ),
         prototypes: NodePrototypeRegistry(const <NodePrototype>[
           NodePrototype(type: 'documented', description: 'What it does.'),
           NodePrototype(type: 'bare'),
+          NodePrototype(type: 'blank', description: '   '),
         ]),
       );
 
@@ -121,26 +123,10 @@ void main() {
         isNot(contains('Description')),
         reason: 'a node whose type has no prototype has nowhere to keep one',
       );
-    });
-
-    test('a blank description counts as none', () {
-      final controller = boot(
-        graph: NodeGraph(nodes: <GraphNode>[node('a', type: 'blank')]),
-        prototypes: NodePrototypeRegistry(const <NodePrototype>[
-          NodePrototype(type: 'blank', description: '   '),
-        ]),
-      );
-
       expect(
-        labels(
-          menus.entriesFor(
-            request(
-              controller,
-              NodeMenuNodeTarget(controller.graph.nodes['a']!, Offset.zero),
-            ),
-          ),
-        ),
+        forNode('d'),
         isNot(contains('Description')),
+        reason: 'a blank description counts as none',
       );
     });
 

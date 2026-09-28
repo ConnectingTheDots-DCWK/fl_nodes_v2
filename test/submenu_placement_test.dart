@@ -155,17 +155,17 @@ void main() {
     );
   });
 
-  testWidgets('a submenu opens on hover and survives the pointer crossing '
-      'into it', (tester) async {
+  testWidgets('a submenu opens on hover, survives crossing, sibling closes', (
+    tester,
+  ) async {
     await boot(tester);
-    // The mouse that right-clicked is still there after the button comes up,
-    // and hovering with it is what a person does next.
-    final mouse = await rightClick(tester, const Offset(300, 560));
+    // The mouse that right-clicked is still there after the button comes up.
+    final mouse = await rightClick(tester, const Offset(300, 200));
     await mouse.moveTo(rowRect(tester, 'Create').center);
     await tester.pumpAndSettle();
     expect(find.text('Group 0'), findsOneWidget, reason: 'opened on hover');
 
-    // Straight sideways off the row and onto the panel, then down it.
+    // Sideways onto the panel, then down it, into a nested cascade.
     final panel = panelRect(tester, 'Group 0');
     await mouse.moveTo(
       Offset(panel.left + 8, rowRect(tester, 'Create').center.dy),
@@ -173,18 +173,14 @@ void main() {
     await tester.pumpAndSettle();
     await mouse.moveTo(rowRect(tester, 'Group 3').center);
     await tester.pumpAndSettle();
-
     expect(find.text('Group 0'), findsOneWidget, reason: 'still open');
     expect(find.text('Kind 3'), findsOneWidget, reason: 'and cascades');
-  });
 
-  testWidgets('hovering a sibling row closes it', (tester) async {
-    await boot(tester);
-    final mouse = await rightClick(tester, const Offset(300, 200));
+    // Back across the row that opened it before reaching for a sibling: a
+    // jump straight from inside the cascade to the sibling skips the hover
+    // that closes it, since nothing else notices the pointer has left.
     await mouse.moveTo(rowRect(tester, 'Create').center);
     await tester.pumpAndSettle();
-    expect(find.text('Group 0'), findsOneWidget);
-
     await mouse.moveTo(rowRect(tester, 'Reset zoom').center);
     await tester.pumpAndSettle();
     expect(find.text('Group 0'), findsNothing);
