@@ -1,2 +1,17 @@
+# A .pubignore replaces .gitignore for `flutter pub publish` rather than adding
+# to it, so everything the .gitignore keeps out is repeated here. With only the
+# line below, a publish from a working checkout shipped build/ — 14 MB of test
+# caches and native assets — where a clean clone had none.
+.dart_tool/
+.flutter-plugins-dependencies
+.fvm/
+build/
+coverage/
+pubspec.lock
+*.iml
+.idea/
+example/build/
+example/.dart_tool/
+
 # Internal notes for whoever works on the package; the README is what pub.dev shows.
 CLAUDE.md
