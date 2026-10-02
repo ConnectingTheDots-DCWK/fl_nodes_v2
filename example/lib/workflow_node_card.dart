@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
 import 'form_node_body.dart';
-import 'prototype_node_bodies.dart';
-import 'prototype_nodes.dart';
+import 'definition_node_bodies.dart';
+import 'definition_nodes.dart';
 import 'workflow_node.dart';
 
 /// Per-type accent colour and icon.
 @immutable
-/// The one part of a node type's looks that is not on its prototype.
+/// The one part of a node type's looks that is not on its definition.
 ///
-/// `label` and `icon` live on [NodePrototype] now, because the editor's own
+/// `label` and `icon` live on [NodeDefinition] now, because the editor's own
 /// Create and Description menus read them from the registry and two tables
 /// that have to agree is one table too many. Colour stayed here: it is how
 /// this demo paints a card, and the editor has no use for it.
@@ -36,9 +36,10 @@ class WorkflowStyle {
   /// The name and icon a node type publishes to the editor, read back so the
   /// card and the menus cannot disagree about either.
   static IconData iconOf(String type) =>
-      workflowPrototypes[type]?.icon ?? Icons.play_arrow_rounded;
+      workflowDefinitions[type]?.icon ?? Icons.play_arrow_rounded;
 
-  static String labelOf(String type) => workflowPrototypes[type]?.label ?? type;
+  static String labelOf(String type) =>
+      workflowDefinitions[type]?.label ?? type;
 }
 
 /// The body of a node.

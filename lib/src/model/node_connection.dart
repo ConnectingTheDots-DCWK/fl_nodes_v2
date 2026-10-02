@@ -30,7 +30,7 @@ class NodeConnection {
   /// The receiving input port.
   final PortRef to;
 
-  /// Host-defined kind, matched against a [LinkPrototype].
+  /// Host-defined kind, matched against a [LinkDefinition].
   final String type;
 
   /// Optional caption drawn at the midpoint of the curve.

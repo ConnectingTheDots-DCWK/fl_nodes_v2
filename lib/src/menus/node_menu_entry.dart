@@ -73,7 +73,7 @@ class NodeMenuEntry {
   /// Drops separators that would render against nothing.
   ///
   /// Menus are assembled from parts that come and go — a description a
-  /// prototype may not declare, a project submenu a host may switch off — so
+  /// definition may not declare, a project submenu a host may switch off — so
   /// tidying at the end is simpler than every builder having to know what its
   /// neighbours decided.
   static List<NodeMenuEntry> tidy(List<NodeMenuEntry> entries) {

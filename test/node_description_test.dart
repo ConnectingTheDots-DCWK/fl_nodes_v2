@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// not tidiness: resolution keeps the node it already has when the ports it
 /// would build compare equal to the ones on it, so a description inside `==`
 /// would make every document written before the prose existed differ from what
-/// its prototype now builds — and opening one would rewrite every node in it.
+/// its definition now builds — and opening one would rewrite every node in it.
 /// The last test here is that regression, written down.
 void main() {
   group('a port', () {
@@ -120,8 +120,8 @@ void main() {
         NodePort.output(id: 'out', family: 'flow', kind: PortKind.control),
       ],
     );
-    final registry = NodePrototypeRegistry(<NodePrototype>[
-      NodePrototype(
+    final registry = NodeDefinitionRegistry(<NodeDefinition>[
+      NodeDefinition(
         type: 'documented',
         description: 'What it does.',
         ports: const <PortFamily>[

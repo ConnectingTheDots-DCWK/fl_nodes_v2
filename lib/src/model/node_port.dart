@@ -112,18 +112,18 @@ class NodePort {
   final String? label;
 
   /// What a wire drawn from this port means, in prose, for the reader of a
-  /// graph — the port's half of [NodePrototype.description].
+  /// graph — the port's half of [NodeDefinition.description].
   ///
   /// **Deliberately outside [==], [hashCode] and the codec.** A port is
   /// serialised, and resolution keeps the node it already has when the ports
   /// it would build compare equal to the ones on it. Were this compared, every
   /// document written before a description existed would come back differing
-  /// from what its prototype now builds, and opening it would rewrite every
+  /// from what its definition now builds, and opening it would rewrite every
   /// node in it — a dirty file for prose nobody edited. Were it serialised,
   /// the same sentence would be copied into every board that holds the node.
   ///
   /// It belongs to the *kind* of port, written once by whoever wrote the
-  /// prototype, so it is stamped on by the family that builds the port and is
+  /// definition, so it is stamped on by the family that builds the port and is
   /// read from there. A port that came off a disk rather than out of a family
   /// carries whatever was written down, which is nothing.
   final String? description;
@@ -145,17 +145,17 @@ class NodePort {
   /// Arbitrary payload for the host application.
   final Object? data;
 
-  /// The prototype family that produced this port, if any.
+  /// The definition family that produced this port, if any.
   ///
-  /// Ports without a family are the host's own: no prototype rewrites or
-  /// removes them, which is what lets a prototyped node keep hand-authored
+  /// Ports without a family are the host's own: no definition rewrites or
+  /// removes them, which is what lets a node with a definition keep hand-authored
   /// ports alongside generated ones. A stamped port, by contrast, belongs to
-  /// its prototype — including being retired when that family stops existing.
+  /// its definition — including being retired when that family stops existing.
   final String? family;
 
   /// The kind of connection a wire drawn from this port becomes.
   ///
-  /// Matched against [LinkPrototype.type], so the port decides what the link
+  /// Matched against [LinkDefinition.type], so the port decides what the link
   /// it emits is allowed to do — whether its caption can be edited, for one.
   /// Null leaves the connection on the default kind.
   final String? linkType;

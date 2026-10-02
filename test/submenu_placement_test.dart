@@ -17,18 +17,19 @@ void main() {
 
   /// Enough categories to make the Create panel taller than the room a
   /// low right-click leaves under it.
-  final NodePrototypeRegistry prototypes =
-      NodePrototypeRegistry(<NodePrototype>[
-        for (var i = 0; i < 12; i++)
-          NodePrototype(type: 'kind$i', label: 'Kind $i', category: 'Group $i'),
-      ]);
+  final NodeDefinitionRegistry definitions = NodeDefinitionRegistry(
+    <NodeDefinition>[
+      for (var i = 0; i < 12; i++)
+        NodeDefinition(type: 'kind$i', label: 'Kind $i', category: 'Group $i'),
+    ],
+  );
 
   Future<NodeEditorController> boot(WidgetTester tester) async {
     // Wide enough that a cascade opened a third of the way in goes right.
     tester.view.physicalSize = const Size(1200, 600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final controller = NodeEditorController(prototypes: prototypes);
+    final controller = NodeEditorController(definitions: definitions);
     addTearDown(controller.dispose);
     await tester.pumpWidget(
       MaterialApp(

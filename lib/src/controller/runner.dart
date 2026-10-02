@@ -228,7 +228,7 @@ class NodeEditorRunner {
     final run = _RunState(
       id: ++_runs,
       graph: _controller._graph,
-      prototypes: _controller._prototypes,
+      definitions: _controller._definitions,
       maxSteps: maxSteps,
       deadline: timeout == null ? null : DateTime.now().add(timeout),
       onStateChanged: _controller._notify,
@@ -602,7 +602,7 @@ class _RunState {
   _RunState({
     required this.id,
     required this.graph,
-    required NodePrototypeRegistry prototypes,
+    required NodeDefinitionRegistry definitions,
     required this.maxSteps,
     required this.deadline,
     required this.onStateChanged,
@@ -623,7 +623,7 @@ class _RunState {
           (port.isOutput ? dataOut : dataIn).add(port.id);
         }
       }
-      final prototype = prototypes[node.type];
+      final definition = definitions[node.type];
       plans[node.id] = _NodePlan(
         node: node,
         controlInputs: controlIn,
@@ -632,8 +632,8 @@ class _RunState {
         dataOutputs: dataOut,
         // Resolved now, so a registry swapped mid-run cannot change the
         // executor between two turns of the same loop.
-        executor: prototype?.onExecute,
-        pure: prototype?.pure ?? true,
+        executor: definition?.onExecute,
+        pure: definition?.pure ?? true,
       );
     }
     // Built from the connection map rather than from connectionsOf, whose
@@ -659,7 +659,7 @@ class _RunState {
   final VoidCallback onStateChanged;
   final Stopwatch watch;
 
-  /// Read once at the start, like the prototypes: a listener swapped mid-run
+  /// Read once at the start, like the definitions: a listener swapped mid-run
   /// would otherwise see half a run.
   final GraphRunListener? listener;
   final bool payloads;

@@ -20,8 +20,8 @@ import '../model/node_group.dart';
 import '../model/node_port.dart';
 import '../model/payload_equality.dart';
 import '../model/port_ref.dart';
-import '../prototype/node_execution.dart';
-import '../prototype/node_prototype_registry.dart';
+import '../definition/node_execution.dart';
+import '../definition/node_definition_registry.dart';
 import '../serialization/document_exceptions.dart';
 import '../serialization/graph_document.dart';
 import '../serialization/node_graph_codec.dart';
@@ -37,8 +37,53 @@ part 'run_trace.dart';
 part 'selection.dart';
 
 /// Decides whether an output port may be wired to an input port.
-typedef ConnectionValidator =
-    bool Function(NodeGraph graph, PortRef from, PortRef to);
+///
+/// It is asked only about a pair that is already one output and one input,
+/// both present, on two nodes unless self-connections are allowed. What it
+/// answers is final, so a rule that *adds* to the package's own checks ands
+/// them in — `check.allowedByDefault && myRule(check)` — and a validator that
+/// ignores [ConnectionCheck.allowedByDefault] replaces them.
+typedef ConnectionValidator = bool Function(ConnectionCheck check);
+
+/// A wire somebody is about to draw, as a [ConnectionValidator] sees it.
+final class ConnectionCheck {
+  ConnectionCheck._(this.graph, this.from, this.to, this.fromPort, this.toPort);
+
+  /// The graph as it is before the wire.
+  final NodeGraph graph;
+
+  /// The output end.
+  final PortRef from;
+
+  /// The input end.
+  final PortRef to;
+
+  final NodePort fromPort;
+  final NodePort toPort;
+
+  /// What the package answers on its own: not a duplicate, room left on both
+  /// ends under [NodePort.maxConnections], and
+  /// [NodeEditorController.portsCompatible]. Worked out only when read, since
+  /// a validator that replaces the checks never needs it.
+  late final bool allowedByDefault =
+      NodeEditorController.portsCompatible(fromPort, toPort) &&
+      !_isDuplicate &&
+      !_isFull(from) &&
+      !_isFull(to);
+
+  bool get _isDuplicate {
+    for (final existing in graph.connectionsOf(from.nodeId)) {
+      if (existing.from == from && existing.to == to) return true;
+    }
+    return false;
+  }
+
+  bool _isFull(PortRef ref) {
+    final limit = graph.nodes[ref.nodeId]?.portById(ref.portId)?.maxConnections;
+    if (limit == null) return false;
+    return graph.connectionsAt(ref).length >= limit;
+  }
+}
 
 /// Works out where every node should go.
 ///
@@ -73,14 +118,13 @@ class NodeEditorController extends ChangeNotifier {
     NodeGraph? graph,
     ViewportTransform viewport = ViewportTransform.identity,
     int historyLimit = 50,
-    ConnectionValidator? connectionValidator,
-    NodePrototypeRegistry? prototypes,
+    this.connectionValidator,
+    NodeDefinitionRegistry? definitions,
     NodeGraphCodec? codec,
     this.allowSelfConnections = false,
     double spatialCellSize = 512,
   }) : _graph = graph ?? NodeGraph.empty,
-       _validator = connectionValidator,
-       _prototypes = prototypes ?? NodePrototypeRegistry.empty {
+       _definitions = definitions ?? NodeDefinitionRegistry.empty {
     history = NodeEditorHistory(this, limit: historyLimit);
     selection = NodeEditorSelection(this);
     emphasis = NodeEditorEmphasis(this);
@@ -91,9 +135,9 @@ class NodeEditorController extends ChangeNotifier {
     runner = NodeEditorRunner(this);
 
     // A document arrives holding only what was authored or loaded; its ports
-    // are the prototypes' to derive.
-    if (_prototypes.isNotEmpty) {
-      _graph = _prototypes.resolveAll(_graph).graph;
+    // are the definitions' to derive.
+    if (_definitions.isNotEmpty) {
+      _graph = _definitions.resolveAll(_graph).graph;
     }
     layout._reindexAll();
     // The document as constructed is the baseline, so `project.isDirty`
@@ -129,9 +173,7 @@ class NodeEditorController extends ChangeNotifier {
   /// Whether a node may be wired back to itself.
   final bool allowSelfConnections;
 
-  final ConnectionValidator? _validator;
-
-  NodePrototypeRegistry _prototypes;
+  NodeDefinitionRegistry _definitions;
 
   NodeGraph _graph;
 
@@ -161,6 +203,13 @@ class NodeEditorController extends ChangeNotifier {
 
   /// Told after every edit that landed, with what it touched.
   GraphEditListener? onEdit;
+
+  /// Whether a pair of ports may be wired; null leaves it to
+  /// [ConnectionCheck.allowedByDefault]. Asked by [canConnect], [connect], a
+  /// drag looking for a target and every wire a paste brings in. Settable like
+  /// [guard], so a host whose rules change with a mode swaps it rather than
+  /// building another controller; wires already drawn are not re-asked.
+  ConnectionValidator? connectionValidator;
 
   /// Bumped whenever node geometry or the graph itself changes.
   ///
@@ -219,10 +268,10 @@ class NodeEditorController extends ChangeNotifier {
   /// a subclass however closely it collaborates. This is the door they use.
   void _notify() => notifyListeners();
 
-  // ------------------------------------------------------------ prototypes
+  // ------------------------------------------------------------ definitions
 
-  /// The prototypes nodes are normalised against.
-  NodePrototypeRegistry get prototypes => _prototypes;
+  /// The definitions nodes are normalised against.
+  NodeDefinitionRegistry get definitions => _definitions;
 
   /// Swaps the registry and re-normalises the whole document.
   ///
@@ -230,9 +279,9 @@ class NodeEditorController extends ChangeNotifier {
   /// construction: editing a family builder and hot-reloading has to reach the
   /// nodes that already exist, or the shapes on screen quietly stop matching
   /// the rules that produced them.
-  set prototypes(NodePrototypeRegistry value) {
-    if (identical(_prototypes, value)) return;
-    _prototypes = value;
+  set definitions(NodeDefinitionRegistry value) {
+    if (identical(_definitions, value)) return;
+    _definitions = value;
     revalidate();
     // The registry also decides which links may be retitled, and that shows on
     // the canvas, so refresh even when no node's shape changed.
@@ -243,12 +292,12 @@ class NodeEditorController extends ChangeNotifier {
   /// Re-derives the shape of [ids], or of every node when null.
   ///
   /// Outside the history by default: this repairs the document to match the
-  /// prototypes, which is not an edit the user made.
+  /// definitions, which is not an edit the user made.
   void revalidate({Iterable<String>? ids, bool recordHistory = false}) {
-    if (_prototypes.isEmpty) return;
+    if (_definitions.isEmpty) return;
     final outcome = ids == null
-        ? _prototypes.resolveAll(_graph)
-        : _prototypes.resolve(_graph, seeds: ids);
+        ? _definitions.resolveAll(_graph)
+        : _definitions.resolve(_graph, seeds: ids);
     _mutate(
       outcome.graph,
       const GraphEdit(kind: GraphEditKind.replace),
@@ -266,7 +315,7 @@ class NodeEditorController extends ChangeNotifier {
   /// which is what undo, redo and whole-document loads need.
   ///
   /// [resolve] lists the nodes whose *shape* may need re-deriving from their
-  /// prototype. The two axes are independent: dragging changes geometry and
+  /// definition. The two axes are independent: dragging changes geometry and
   /// nothing else, wiring changes shape and nothing else — which is what keeps
   /// the resolver off the drag path entirely.
   void _mutate(
@@ -277,18 +326,18 @@ class NodeEditorController extends ChangeNotifier {
     Iterable<String> resolve = const <String>[],
   }) {
     // Before anything is computed: a refused edit must cost nothing and, more
-    // to the point, must not have resolved prototypes against a graph that is
+    // to the point, must not have resolved definitions against a graph that is
     // then thrown away.
     if (guard?.call(edit) == false) return;
     var settled = next;
     Set<String>? reshaped;
-    if (resolve.isNotEmpty && _prototypes.isNotEmpty) {
-      final outcome = _prototypes.resolve(next, seeds: resolve);
+    if (resolve.isNotEmpty && _definitions.isNotEmpty) {
+      final outcome = _definitions.resolve(next, seeds: resolve);
       settled = outcome.graph;
       if (outcome.changed.isNotEmpty) reshaped = outcome.changed;
     }
     // Compare the settled graph, not the caller's. An edit that contradicts a
-    // prototype resolves straight back to the graph we already have, and that
+    // definition resolves straight back to the graph we already have, and that
     // has to be a real no-op rather than an undo entry that changes nothing.
     if (settled == _graph) return;
     // Any edit that lands ends the current run of typing, so the next
@@ -316,7 +365,7 @@ class NodeEditorController extends ChangeNotifier {
 
   /// Replaces the whole document, e.g. after loading from disk.
   ///
-  /// [normalise] re-derives every node's shape from its prototype, which is
+  /// [normalise] re-derives every node's shape from its definition, which is
   /// what lets a document persist only its field values and get its ports back.
   void replaceGraph(
     NodeGraph graph, {
@@ -335,11 +384,11 @@ class NodeEditorController extends ChangeNotifier {
     if (!recordHistory) history._reset();
   }
 
-  /// Adds [node], deriving its shape if a prototype claims its type.
+  /// Adds [node], deriving its shape if a definition claims its type.
   ///
   /// Resolution doubles as instantiation: a node added with no ports at all
-  /// comes back with the ones its prototype says it should have, so there is
-  /// no separate "create from prototype" call to remember.
+  /// comes back with the ones its definition says it should have, so there is
+  /// no separate "create from definition" call to remember.
   void addNode(GraphNode node) => _mutate(
     _graph.putNode(node),
     GraphEdit(kind: GraphEditKind.addNodes, nodeIds: <String>{node.id}),
@@ -375,7 +424,7 @@ class NodeEditorController extends ChangeNotifier {
     // Collected before the removal: deleting the node that consumed a variadic
     // exit has to let the node at the other end shrink again.
     final neighbours = <String>{};
-    if (_prototypes.isNotEmpty) {
+    if (_definitions.isNotEmpty) {
       for (final id in doomed) {
         for (final connection in _graph.connectionsOf(id)) {
           if (!doomed.contains(connection.from.nodeId)) {
@@ -776,8 +825,8 @@ class NodeEditorController extends ChangeNotifier {
   /// An equal map is not an edit: nothing is recorded and no listener hears
   /// of it, so a dialog that closes with the same rows it opened with leaves
   /// the history and the dirty flag exactly as they were. Reported as
-  /// [GraphEditKind.updateNodes] like any other change to a node. Prototypes
-  /// are not re-resolved — nothing a prototype answers reads metadata — and
+  /// [GraphEditKind.updateNodes] like any other change to a node. Definitions
+  /// are not re-resolved — nothing a definition answers reads metadata — and
   /// the graph's geometry does not move.
   void setNodeMetadata(String id, Map<String, Object?> metadata) {
     final node = _graph.nodes[id];
@@ -793,7 +842,7 @@ class NodeEditorController extends ChangeNotifier {
   void removeConnections(Iterable<String> ids) {
     final doomed = ids.toList(growable: false);
     final endpoints = <String>{};
-    if (_prototypes.isNotEmpty) {
+    if (_definitions.isNotEmpty) {
       for (final id in doomed) {
         final connection = _graph.connection(id);
         if (connection == null) continue;
@@ -851,45 +900,40 @@ class NodeEditorController extends ChangeNotifier {
       resolve: <String>{pair.$1.nodeId, pair.$2.nodeId},
     );
     // Wiring a port can change the shape of the node it belongs to, and a
-    // prototype is free to resolve that port away again. Report what actually
+    // definition is free to resolve that port away again. Report what actually
     // survived rather than an id the caller would dereference to nothing.
     return _graph.connections.containsKey(connection.id) ? connection.id : null;
   }
 
-  /// Orders a candidate pair as (output, input) and validates it.
-  (PortRef, PortRef)? _normalize(PortRef a, PortRef b) {
-    final portA = _portOf(a);
-    final portB = _portOf(b);
+  /// Orders a candidate pair as (output, input) and validates it against
+  /// [graph], the current one unless a paste is judging the graph it is about
+  /// to make.
+  (PortRef, PortRef)? _normalize(PortRef a, PortRef b, {NodeGraph? graph}) {
+    final subject = graph ?? _graph;
+    final portA = subject.nodes[a.nodeId]?.portById(a.portId);
+    final portB = subject.nodes[b.nodeId]?.portById(b.portId);
     if (portA == null || portB == null) return null;
     if (portA.direction == portB.direction) return null;
 
     final (from, to) = portA.isOutput ? (a, b) : (b, a);
     if (!allowSelfConnections && from.nodeId == to.nodeId) return null;
 
-    final validator = _validator ?? defaultConnectionValidator;
-    if (!validator(_graph, from, to)) return null;
-    return (from, to);
+    final check = ConnectionCheck._(
+      subject,
+      from,
+      to,
+      portA.isOutput ? portA : portB,
+      portA.isOutput ? portB : portA,
+    );
+    final validator = connectionValidator;
+    final allowed = validator == null
+        ? check.allowedByDefault
+        : validator(check);
+    return allowed ? (from, to) : null;
   }
 
   NodePort? _portOf(PortRef ref) =>
       _graph.nodes[ref.nodeId]?.portById(ref.portId);
-
-  /// Rejects duplicates, respects each port's [NodePort.maxConnections], and
-  /// refuses a pair whose [portsCompatible] says they do not belong together.
-  static bool defaultConnectionValidator(
-    NodeGraph graph,
-    PortRef from,
-    PortRef to,
-  ) {
-    for (final existing in graph.connectionsOf(from.nodeId)) {
-      if (existing.from == from && existing.to == to) return false;
-    }
-    final source = graph.nodes[from.nodeId]?.portById(from.portId);
-    final target = graph.nodes[to.nodeId]?.portById(to.portId);
-    if (source == null || target == null) return false;
-    if (!portsCompatible(source, target)) return false;
-    return !_isPortFull(graph, from) && !_isPortFull(graph, to);
-  }
 
   /// Whether two ports carry the same thing.
   ///
@@ -899,19 +943,12 @@ class NodeEditorController extends ChangeNotifier {
   /// untyped port is a wildcard, which is what keeps a graph written before
   /// types existed entirely legal.
   ///
-  /// Exposed because a host that supplies its own [ConnectionValidator]
-  /// replaces [defaultConnectionValidator] wholesale, and would otherwise lose
-  /// this along with the duplicate and capacity checks.
+  /// Part of [ConnectionCheck.allowedByDefault], and public for a validator
+  /// that replaces the default but still wants this half of it.
   static bool portsCompatible(NodePort from, NodePort to) {
     if (from.kind != to.kind) return false;
     if (from.dataType == null || to.dataType == null) return true;
     return from.dataType == to.dataType;
-  }
-
-  static bool _isPortFull(NodeGraph graph, PortRef ref) {
-    final limit = graph.nodes[ref.nodeId]?.portById(ref.portId)?.maxConnections;
-    if (limit == null) return false;
-    return graph.connectionsAt(ref).length >= limit;
   }
 
   /// Generates ids of the form `prefix_0`, `prefix_1`, ... unique within this

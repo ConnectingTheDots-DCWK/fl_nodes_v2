@@ -37,7 +37,7 @@ class NodeEditorLayout {
   /// measured one.
   ///
   /// Deliberately not [sizeOf]. Every explicit anchor is a fraction of the
-  /// height its prototype laid the rows out at, so a card made taller than
+  /// height its definition laid the rows out at, so a card made taller than
   /// that must keep its handles on the rows rather than sliding them down
   /// the empty room below. A measured node's content is already laid out to
   /// its floor — see `NodeView` — so for it the two agree.

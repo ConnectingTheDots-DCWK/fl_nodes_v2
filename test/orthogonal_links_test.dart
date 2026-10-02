@@ -353,9 +353,9 @@ void main() {
   });
 
   group('on the canvas', () {
-    final NodePrototypeRegistry prototypes = NodePrototypeRegistry(
-      const <NodePrototype>[
-        NodePrototype(
+    final NodeDefinitionRegistry definitions = NodeDefinitionRegistry(
+      const <NodeDefinition>[
+        NodeDefinition(
           type: 'step',
           label: 'Step',
           ports: <PortFamily>[
@@ -394,7 +394,7 @@ void main() {
             ),
           ],
         ),
-        prototypes: prototypes,
+        definitions: definitions,
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(

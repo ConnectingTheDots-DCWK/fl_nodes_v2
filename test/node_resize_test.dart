@@ -10,15 +10,15 @@ import 'package:fl_nodes_v2/src/widgets/node_view.dart';
 
 /// Dragging a node's bottom-right corner resizes it.
 ///
-/// A prototype opts in with `resizable`; the width's floor is its
+/// A definition opts in with `resizable`; the width's floor is its
 /// `defaultWidth`, the height's floor is whatever the node already is, and
 /// the corner is `NodeView.resizeGripSize` square — the minimap's grip. The
 /// gesture is the node's own pan recogniser deciding what a press meant from
 /// where it landed, so nothing here contests the arena.
 void main() {
-  final NodePrototypeRegistry prototypes = NodePrototypeRegistry(
-    const <NodePrototype>[
-      NodePrototype(
+  final NodeDefinitionRegistry definitions = NodeDefinitionRegistry(
+    const <NodeDefinition>[
+      NodeDefinition(
         type: 'card',
         label: 'Card',
         defaultWidth: 200,
@@ -35,7 +35,7 @@ void main() {
           ),
         ],
       ),
-      NodePrototype(type: 'fixed', label: 'Fixed', defaultWidth: 200),
+      NodeDefinition(type: 'fixed', label: 'Fixed', defaultWidth: 200),
     ],
   );
 
@@ -44,10 +44,10 @@ void main() {
     String type = 'card',
     bool snap = false,
   }) async {
-    final controller = NodeEditorController(prototypes: prototypes);
+    final controller = NodeEditorController(definitions: definitions);
     addTearDown(controller.dispose);
     controller.addNode(
-      prototypes.instantiate(type, id: 'a', position: const Offset(100, 100)),
+      definitions.instantiate(type, id: 'a', position: const Offset(100, 100)),
     );
     controller.history.clear();
     controller.snapToGrid = snap;
@@ -161,8 +161,8 @@ void main() {
   testWidgets('a declared height keeps its handles on their rows when '
       'stretched', (tester) async {
     final controller = NodeEditorController(
-      prototypes: NodePrototypeRegistry(const <NodePrototype>[
-        NodePrototype(
+      definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+        NodeDefinition(
           type: 'fixed',
           resizable: true,
           defaultWidth: 200,
@@ -209,7 +209,7 @@ void main() {
     expect(moved.width, 200);
   });
 
-  testWidgets('the width is clamped to the prototype', (tester) async {
+  testWidgets('the width is clamped to the definition', (tester) async {
     final controller = await boot(tester);
 
     await drag(
@@ -262,7 +262,7 @@ void main() {
     expect(node.minHeight, 160);
   });
 
-  testWidgets('a prototype that did not opt in has no grip', (tester) async {
+  testWidgets('a definition that did not opt in has no grip', (tester) async {
     final controller = await boot(tester, type: 'fixed');
 
     await drag(tester, controller, const Offset(296, 216), const Offset(60, 0));

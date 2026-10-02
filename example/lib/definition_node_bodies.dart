@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
-import 'prototype_nodes.dart';
+import 'definition_nodes.dart';
 import 'workflow_node.dart';
 
 /// The body of the format node.
 ///
 /// Worth comparing with `form_node_body.dart`: the write-back and transaction
 /// pattern is identical, but nothing here decides what rows to draw. The rows
-/// come from `prototypes.fieldsOf`, so they follow the format string — the same
+/// come from `definitions.fieldsOf`, so they follow the format string — the same
 /// source of truth that decides how many input ports the node has.
 class FormatNodeBody extends StatefulWidget {
   const FormatNodeBody({super.key, required this.node, required this.isDark});
@@ -25,7 +25,7 @@ class _FormatNodeBodyState extends State<FormatNodeBody> {
   final FocusNode _formatFocus = FocusNode();
 
   /// One controller per declared argument, created and disposed as the
-  /// prototype adds and removes them.
+  /// definition adds and removes them.
   final Map<String, TextEditingController> _args =
       <String, TextEditingController>{};
   final Map<String, FocusNode> _argFocus = <String, FocusNode>{};
@@ -79,7 +79,7 @@ class _FormatNodeBodyState extends State<FormatNodeBody> {
   }
 
   List<NodeField> get _declaredArgs => <NodeField>[
-    for (final field in _controller.prototypes.fieldsOf(
+    for (final field in _controller.definitions.fieldsOf(
       _controller.graph,
       widget.node,
     ))

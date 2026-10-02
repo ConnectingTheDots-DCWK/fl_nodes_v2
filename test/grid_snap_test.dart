@@ -18,9 +18,9 @@ void main() {
     gridSpacing: spacing,
   );
 
-  final NodePrototypeRegistry prototypes = NodePrototypeRegistry(
-    const <NodePrototype>[
-      NodePrototype(
+  final NodeDefinitionRegistry definitions = NodeDefinitionRegistry(
+    const <NodeDefinition>[
+      NodeDefinition(
         type: 'step',
         label: 'Step',
         ports: <PortFamily>[
@@ -48,7 +48,7 @@ void main() {
   NodeEditorController headless(List<GraphNode> nodes) {
     final controller = NodeEditorController(
       graph: NodeGraph(nodes: nodes),
-      prototypes: prototypes,
+      definitions: definitions,
     );
     addTearDown(controller.dispose);
     return controller;
@@ -64,7 +64,7 @@ void main() {
       graph: NodeGraph(
         nodes: nodes ?? <GraphNode>[node('a', const Offset(100, 100))],
       ),
-      prototypes: prototypes,
+      definitions: definitions,
     );
     addTearDown(controller.dispose);
     controller.history.clear();
@@ -455,12 +455,12 @@ void main() {
     ) async {
       final first = NodeEditorController(
         graph: NodeGraph(nodes: <GraphNode>[node('a', Offset.zero)]),
-        prototypes: prototypes,
+        definitions: definitions,
       );
       addTearDown(first.dispose);
       final second = NodeEditorController(
         graph: NodeGraph(nodes: <GraphNode>[node('a', const Offset(7, 7))]),
-        prototypes: prototypes,
+        definitions: definitions,
       );
       addTearDown(second.dispose);
 
@@ -507,7 +507,7 @@ void main() {
             node('b', const Offset(320, 100)),
           ],
         ),
-        prototypes: prototypes,
+        definitions: definitions,
       );
       addTearDown(controller.dispose);
 

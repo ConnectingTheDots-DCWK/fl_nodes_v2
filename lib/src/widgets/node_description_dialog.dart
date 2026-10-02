@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Shows a node's description, read-only.
 ///
 /// A description belongs to a *kind* of node — it is written once, on the
-/// prototype, by whoever wrote that prototype — so there is nothing here for
+/// definition, by whoever wrote that definition — so there is nothing here for
 /// the app user to edit. It is the same modal shape as
 /// `showConnectionLabelEditor` for the same reason: canvas-anchored prose
 /// would have to be positioned, scaled and clipped along with everything else.

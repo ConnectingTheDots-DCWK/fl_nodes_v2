@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 import 'package:fl_nodes_v2_example/form_node_body.dart';
 import 'package:fl_nodes_v2_example/main.dart';
-import 'package:fl_nodes_v2_example/prototype_nodes.dart';
+import 'package:fl_nodes_v2_example/definition_nodes.dart';
 import 'package:fl_nodes_v2_example/sample_graph.dart';
 import 'package:fl_nodes_v2_example/workflow_node.dart';
 
@@ -119,27 +119,27 @@ void main() {
 
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    // Grouped, because every demo prototype names a category.
+    // Grouped, because every demo definition names a category.
     expect(find.text('Flow'), findsOneWidget);
     expect(find.text('Data'), findsOneWidget);
     expect(find.text('Content'), findsOneWidget);
   });
 
-  test('every node type the demo draws is a registered prototype', () {
+  test('every node type the demo draws is a registered definition', () {
     expect(
       <String>{for (final type in WorkflowNodeType.values) type.name},
-      workflowPrototypes.types.toSet(),
+      workflowDefinitions.types.toSet(),
       reason:
           'the Create menu reads the registry, so a type missing from it '
           'is a type nobody can make',
     );
-    for (final type in workflowPrototypes.types) {
+    for (final type in workflowDefinitions.types) {
       expect(
-        workflowPrototypes[type]!.label,
+        workflowDefinitions[type]!.label,
         isNotNull,
         reason: '"$type" would be left out of the Create menu',
       );
-      expect(workflowPrototypes[type]!.description, isNotNull);
+      expect(workflowDefinitions[type]!.description, isNotNull);
     }
   });
 
@@ -159,7 +159,7 @@ void main() {
     expect(authored.node('route')!.ports, isEmpty);
     expect(authored.node('greeting')!.ports, isEmpty);
 
-    final graph = workflowPrototypes.resolveAll(authored).graph;
+    final graph = workflowDefinitions.resolveAll(authored).graph;
 
     for (final connection in graph.connections.values) {
       expect(graph.node(connection.from.nodeId), isNotNull);

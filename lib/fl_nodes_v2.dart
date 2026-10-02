@@ -16,6 +16,7 @@ export 'src/controller/graph_edit.dart'
     show GraphEdit, GraphEditKind, GraphEditGuard, GraphEditListener;
 export 'src/controller/node_editor_controller.dart'
     show
+        ConnectionCheck,
         ConnectionValidator,
         GraphDocumentSink,
         GraphDocumentSource,
@@ -76,33 +77,33 @@ export 'src/model/node_port.dart'
     show NodePort, PortDirection, PortKind, PortSide;
 export 'src/model/payload_equality.dart' show payloadEquals, payloadHash;
 export 'src/model/port_ref.dart' show PortRef;
-export 'src/prototype/link_prototype.dart'
+export 'src/definition/link_definition.dart'
     show
         DerivedLinkLabel,
         EditableLinkLabel,
         LinkLabel,
         LinkLabelBuilder,
-        LinkPrototype,
+        LinkDefinition,
         LinkResolutionContext;
-export 'src/prototype/node_execution.dart'
+export 'src/definition/node_execution.dart'
     show GraphLogEntry, GraphLogLevel, NodeExecutionContext, NodeExecutor;
-export 'src/prototype/node_prototype.dart'
+export 'src/definition/node_definition.dart'
     show
         DynamicFieldFamily,
         DynamicPortFamily,
         FieldFamily,
         NodeField,
-        NodePrototype,
+        NodeDefinition,
         PortFamily,
         StaticFieldFamily,
         StaticPortFamily;
-export 'src/prototype/node_prototype_registry.dart'
+export 'src/definition/node_definition_registry.dart'
     show
         NodeFieldGroup,
-        NodePrototypeRegistry,
-        PrototypeDivergenceHandler,
-        PrototypeResolution;
-export 'src/prototype/node_resolution.dart'
+        NodeDefinitionRegistry,
+        DefinitionDivergenceHandler,
+        DefinitionResolution;
+export 'src/definition/node_resolution.dart'
     show
         FieldFamilyBuilder,
         NodeFieldMerge,
@@ -114,7 +115,7 @@ export 'src/prototype/node_resolution.dart'
         PortFamilyBuilder,
         PortRemoval,
         PortRemovalHandler;
-export 'src/prototype/port_family_builders.dart' show PortFamilies;
+export 'src/definition/port_family_builders.dart' show PortFamilies;
 export 'src/menus/node_editor_menu_host.dart' show NodeEditorMenuHost;
 export 'src/menus/node_submenu_button.dart' show CascadeSide, NodeSubmenuButton;
 export 'src/menus/node_editor_menus.dart'
@@ -132,13 +133,12 @@ export 'src/menus/node_menu_entry.dart' show NodeMenuEntry;
 export 'src/minimap/minimap_config.dart' show MinimapConfig, MinimapNodeColor;
 export 'src/minimap/minimap_controller.dart' show MinimapController;
 export 'src/minimap/minimap_painter.dart' show MinimapPainter;
-export 'src/minimap/minimap_projection.dart'
-    show MinimapProjection, minimapNodeColor, minimapShadeBands;
+export 'src/minimap/minimap_projection.dart' show MinimapProjection;
 export 'src/minimap/minimap_scene.dart' show MinimapScene;
 export 'src/painting/connection_label.dart'
     show ConnectionCaption, ConnectionLabel;
 export 'src/painting/connection_layout.dart'
-    show ConnectionGeometry, ConnectionLayout, arrowheadSize, arrowheadsPath;
+    show ConnectionGeometry, ConnectionLayout;
 export 'src/painting/connections_painter.dart' show ConnectionsPainter;
 export 'src/painting/emphasis_painter.dart' show EmphasisPainter;
 export 'src/painting/grid_painter.dart' show GridPainter;

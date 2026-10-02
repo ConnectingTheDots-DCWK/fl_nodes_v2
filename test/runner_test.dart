@@ -34,21 +34,21 @@ void main() {
   );
 
   /// A node that flows straight through, recording that it ran.
-  NodePrototype step(
+  NodeDefinition step(
     String type, {
     NodeExecutor? onExecute,
     bool pure = true,
-  }) => NodePrototype(type: type, onExecute: onExecute, pure: pure);
+  }) => NodeDefinition(type: type, onExecute: onExecute, pure: pure);
 
   NodeEditorController controllerWith(
     List<GraphNode> nodes,
     List<NodeConnection> connections,
-    List<NodePrototype> prototypes, {
+    List<NodeDefinition> definitions, {
     bool allowSelfConnections = false,
   }) {
     final controller = NodeEditorController(
       graph: NodeGraph(nodes: nodes, connections: connections),
-      prototypes: NodePrototypeRegistry(prototypes),
+      definitions: NodeDefinitionRegistry(definitions),
       allowSelfConnections: allowSelfConnections,
     );
     addTearDown(controller.dispose);
@@ -67,7 +67,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'c', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run();
@@ -92,7 +92,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'c', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run();
@@ -100,7 +100,7 @@ void main() {
       expect(
         run.trace,
         <String>['a', 'b', 'c'],
-        reason: 'a node with no prototype at all still hands the flow on',
+        reason: 'a node with no definition at all still hands the flow on',
       );
     });
 
@@ -115,7 +115,7 @@ void main() {
           wire('1', 'a', 'l', 'l', 'in'),
           wire('2', 'a', 'r', 'r', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run();
@@ -141,7 +141,7 @@ void main() {
           wire('2', 'fork', 'r', 'r1', 'in'),
           wire('3', 'l1', 'out', 'l2', 'in'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('pass'),
           step('fork', onExecute: (c) async => c.flowAll(<String>['l', 'r'])),
         ],
@@ -168,7 +168,7 @@ void main() {
           wire('1', 'fork', 'l', 'join', 'in'),
           wire('2', 'fork', 'r', 'join', 'in'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('pass'),
           step('fork', onExecute: (c) async => c.flowAll(<String>['l', 'r'])),
         ],
@@ -199,7 +199,7 @@ void main() {
           wire('1', 'pick', 'yes', 'yes', 'in'),
           wire('2', 'pick', 'no', 'no', 'in'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('pass'),
           step('pick', onExecute: (c) async => c.flow('yes')),
         ],
@@ -225,7 +225,7 @@ void main() {
           wire('1', 'head', 'left', 'both', 'a'),
           wire('2', 'head', 'right', 'both', 'b'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step(
             'pick',
             onExecute: (c) async => c.flowAll(<String>['left', 'right']),
@@ -261,7 +261,7 @@ void main() {
           wire('1', 'root', 'out', 'sink', 'in'),
           wire('2', 'value', 'v', 'sink', 'v'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step(
             'root',
             onExecute: (c) async {
@@ -295,10 +295,10 @@ void main() {
 
   group('data flow', () {
     /// `value` emits a field; `sink` records what reached it.
-    List<NodePrototype> valueAndSink({int? evaluations, bool pure = true}) {
+    List<NodeDefinition> valueAndSink({int? evaluations, bool pure = true}) {
       var count = 0;
-      return <NodePrototype>[
-        NodePrototype(
+      return <NodeDefinition>[
+        NodeDefinition(
           type: 'value',
           pure: pure,
           onExecute: (context) async {
@@ -350,8 +350,8 @@ void main() {
           ]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[
-          NodePrototype(
+        <NodeDefinition>[
+          NodeDefinition(
             type: 'sink',
             onExecute: (context) async {
               had = context.hasInput('value');
@@ -397,9 +397,9 @@ void main() {
           wire('c2', 'b', 'out', 's', 'value'),
           wire('c1', 'a', 'out', 's', 'value'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           ...valueAndSink(),
-          NodePrototype(
+          NodeDefinition(
             type: 'sink',
             onExecute: (context) async {
               seen = context.input<String>('value');
@@ -446,7 +446,7 @@ void main() {
           wire('2', 'b', 'out', 'a', 'in'),
           wire('3', 'a', 'out', 's', 'value'),
         ],
-        <NodePrototype>[...valueAndSink()],
+        <NodeDefinition>[...valueAndSink()],
       );
 
       final run = await controller.runner.run();
@@ -481,15 +481,15 @@ void main() {
           wire('3', 'y', 'out', 's', 'l'),
           wire('4', 'w', 'out', 's', 'r'),
         ],
-        <NodePrototype>[
-          NodePrototype(
+        <NodeDefinition>[
+          NodeDefinition(
             type: 'root',
             onExecute: (context) async {
               evaluations++;
               context.emit('out', 1);
             },
           ),
-          NodePrototype(
+          NodeDefinition(
             type: 'mid',
             onExecute: (context) async =>
                 context.emit('out', context.inputOr<int>('in', 0) + 1),
@@ -530,8 +530,8 @@ void main() {
           wire('2', 'n', 'out', 'b', 'value'),
           wire('3', 'a', 'out', 'b', 'in'),
         ],
-        <NodePrototype>[
-          NodePrototype(
+        <NodeDefinition>[
+          NodeDefinition(
             type: 'now',
             pure: false,
             onExecute: (context) async => context.emit('out', ++evaluations),
@@ -576,8 +576,8 @@ void main() {
             wire('3', 'twice', 'out', 'body', 'value'),
             wire('4', 'body', 'out', 'loop', 'in'),
           ],
-          <NodePrototype>[
-            NodePrototype(
+          <NodeDefinition>[
+            NodeDefinition(
               type: 'loop',
               onExecute: (context) async {
                 final i = (context.state['i'] as int? ?? 0) + 1;
@@ -586,7 +586,7 @@ void main() {
                 if (i <= 3) context.flow('body');
               },
             ),
-            NodePrototype(
+            NodeDefinition(
               type: 'twice',
               onExecute: (context) async {
                 doubles++;
@@ -629,7 +629,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'a', 'value'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('sink'),
           step('later', onExecute: (c) async => c.emit('out', 'late')),
         ],
@@ -654,8 +654,8 @@ void main() {
           node('loop', 'loop', <NodePort>[controlIn(), controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[
-          NodePrototype(
+        <NodeDefinition>[
+          NodeDefinition(
             type: 'loop',
             onExecute: (context) async {
               final n = (context.state['n'] as int? ?? 0) + 1;
@@ -687,7 +687,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'a', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run(
@@ -711,7 +711,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'a', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run();
@@ -740,13 +740,13 @@ void main() {
           ]),
         ],
         <NodeConnection>[wire('1', 'v', 'out', 'u', 'in')],
-        <NodePrototype>[
-          NodePrototype(
+        <NodeDefinition>[
+          NodeDefinition(
             type: 'value',
             onExecute: (c) async =>
                 c.emit('out', c.fieldOr<String>('text', '')),
           ),
-          NodePrototype(
+          NodeDefinition(
             type: 'upper',
             onExecute: (c) async =>
                 c.emit('out', c.inputOr<String>('in', '').toUpperCase()),
@@ -770,7 +770,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'c', 'in'),
         ],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('ok'),
           step('bad', onExecute: (c) async => throw StateError('nope')),
         ],
@@ -792,7 +792,7 @@ void main() {
           node('a', 'bad', <NodePort>[controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[step('bad', onExecute: (c) async => c.emit('out', 1))],
+        <NodeDefinition>[step('bad', onExecute: (c) async => c.emit('out', 1))],
       );
 
       final run = await controller.runner.run();
@@ -818,7 +818,7 @@ void main() {
           ]),
         ],
         <NodeConnection>[wire('1', 'a', 'out', 's', 'value')],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('keep', onExecute: (c) async => stashed = c),
           step('sink'),
         ],
@@ -846,7 +846,7 @@ void main() {
           node('a', 'slow', <NodePort>[controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[step('slow', onExecute: (c) async => gate.future)],
+        <NodeDefinition>[step('slow', onExecute: (c) async => gate.future)],
       );
 
       final first = controller.runner.run();
@@ -866,7 +866,7 @@ void main() {
           node('b', 'pass', <NodePort>[controlIn()]),
         ],
         <NodeConnection>[wire('1', 'a', 'out', 'b', 'in')],
-        <NodePrototype>[
+        <NodeDefinition>[
           step('slow', onExecute: (c) async => gate.future),
           step('pass'),
         ],
@@ -896,7 +896,7 @@ void main() {
           node('b', 'pass', <NodePort>[controlIn()]),
         ],
         <NodeConnection>[wire('1', 'a', 'out', 'b', 'in')],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
       final graph = controller.graph;
       final revision = controller.revision;
@@ -924,7 +924,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'c', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
 
       final run = await controller.runner.run(from: <String>['b']);
@@ -945,7 +945,7 @@ void main() {
     };
 
     /// `value` emits its `text` field; `sink` takes a value and passes on.
-    List<NodePrototype> valueAndSink() => <NodePrototype>[
+    List<NodeDefinition> valueAndSink() => <NodeDefinition>[
       step(
         'value',
         onExecute: (c) async => c.emit('out', c.field<String>('text')),
@@ -984,7 +984,7 @@ void main() {
           wire('1', 'a', 'out', 'b', 'in'),
           wire('2', 'b', 'out', 'c', 'in'),
         ],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
       final recorder = GraphRunRecorder();
       controller.runner.onEvent = recorder.call;
@@ -1097,7 +1097,7 @@ void main() {
           ]),
         ],
         <NodeConnection>[wire('1', 'q', 'out', 's', 'value')],
-        <NodePrototype>[step('quiet', onExecute: (_) async {}), step('sink')],
+        <NodeDefinition>[step('quiet', onExecute: (_) async {}), step('sink')],
       );
       final recorder = GraphRunRecorder();
       controller.runner.onEvent = recorder.call;
@@ -1220,7 +1220,7 @@ void main() {
           node('a', 'talk', <NodePort>[controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[
+        <NodeDefinition>[
           step(
             'talk',
             onExecute: (c) async => c.log(
@@ -1269,7 +1269,7 @@ void main() {
             node('a', 'boom', <NodePort>[controlOut()]),
           ],
           const <NodeConnection>[],
-          <NodePrototype>[
+          <NodeDefinition>[
             step('boom', onExecute: (_) async => throw StateError('no')),
           ],
         );
@@ -1291,7 +1291,7 @@ void main() {
             node('a', 'slow', <NodePort>[const NodePort.output(id: 'out')]),
           ],
           const <NodeConnection>[],
-          <NodePrototype>[
+          <NodeDefinition>[
             step(
               'slow',
               onExecute: (c) async {
@@ -1330,7 +1330,7 @@ void main() {
           node('b', 'pass', <NodePort>[controlIn()]),
         ],
         <NodeConnection>[wire('1', 'a', 'out', 'b', 'in')],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
       final reported = <FlutterErrorDetails>[];
       final previous = FlutterError.onError;
@@ -1358,7 +1358,7 @@ void main() {
           node('a', 'pass', <NodePort>[controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
       final recorder = GraphRunRecorder();
       controller.runner.onEvent = recorder.call;
@@ -1382,7 +1382,7 @@ void main() {
           node('a', 'pass', <NodePort>[controlOut()]),
         ],
         const <NodeConnection>[],
-        <NodePrototype>[step('pass')],
+        <NodeDefinition>[step('pass')],
       );
       final recorder = GraphRunRecorder();
       controller.runner.onEvent = recorder.call;

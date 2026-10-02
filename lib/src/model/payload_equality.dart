@@ -4,7 +4,7 @@
 /// whatever a JSON decoder produced. Dart compares `List` and `Map` by
 /// identity, so without this a decoded payload would never equal the one it was
 /// written from — and a port whose payload compared unequal on every pass would
-/// keep its node from ever settling under a prototype.
+/// keep its node from ever settling under a definition.
 ///
 /// Comparing here rather than wrapping decoded containers in a value-equal type
 /// keeps the equality symmetric. A wrapper can only ever be equal to a plain

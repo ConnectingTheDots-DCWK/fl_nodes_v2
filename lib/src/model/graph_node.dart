@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'node_port.dart';
 import 'payload_equality.dart';
+import 'typed_value.dart';
 
 /// A single box on the canvas.
 ///
@@ -49,12 +50,12 @@ class GraphNode {
   /// The least tall the node is drawn, whatever [height] or its content says
   /// — what a person dragging the corner chose. Null when nobody has.
   ///
-  /// A floor rather than a height, so it never fights the prototype: a card
+  /// A floor rather than a height, so it never fights the definition: a card
   /// that grows a row keeps the row, and one that loses a row keeps the room
   /// somebody asked for. The box extends **below** the declared height and
   /// the ports stay where they were — every explicit anchor is a fraction of
   /// [height], not of the box — so a wire lands on the same row of a card
-  /// however tall the card has been made. A prototype that wants the extra
+  /// however tall the card has been made. A definition that wants the extra
   /// room *used* rather than left blank reads this in `resolveHeight` and
   /// answers with a taller [height] laid out to it.
   final double? minHeight;
@@ -65,9 +66,9 @@ class GraphNode {
   final Map<String, Object?> data;
 
   /// Annotations the host's *user* attaches to a node: plain JSON the editor
-  /// never reads and no prototype ever shapes.
+  /// never reads and no definition ever shapes.
   ///
-  /// Beside [data] rather than in it, because [data] is what a prototype
+  /// Beside [data] rather than in it, because [data] is what a definition
   /// declares and resolution keeps in step — `seedAndPrune` drops a key a
   /// dynamic family stopped declaring — whereas what somebody wrote *about* a
   /// node is nobody's to prune. Nested as deep as the host likes; encoded
@@ -120,6 +121,22 @@ class GraphNode {
       selectable: selectable ?? this.selectable,
     );
   }
+
+  /// The [data] value at [key] as a [T], or null when there is none or it is
+  /// something else.
+  ///
+  /// A wrong type reads as missing rather than throwing, because [data] comes
+  /// back from a file. An `int` is accepted as a `double`: `1.0` comes back as
+  /// `1` from anything that is not the Dart VM. The same rule as the
+  /// `field` a definition's resolver and executor read through.
+  T? field<T>(String key) => typedValue<T>(data[key]);
+
+  /// [field], or [fallback] when that is null.
+  T fieldOr<T>(String key, T fallback) => field<T>(key) ?? fallback;
+
+  /// The [metadata] value at [key] as a [T], read by the rule [field] reads
+  /// [data] by.
+  T? metadataValue<T>(String key) => typedValue<T>(metadata[key]);
 
   /// Returns a copy with [entries] merged into [data].
   GraphNode withData(Map<String, Object?> entries) =>

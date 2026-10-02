@@ -27,7 +27,7 @@ cd example && flutter run
 
 ```yaml
 dependencies:
-  fl_nodes_v2: ^0.5.0
+  fl_nodes_v2: ^1.0.0
 ```
 
 ```dart
@@ -85,7 +85,8 @@ it) and returns any widget.
 > the one input it cannot compare, so every node rebuilds. Wrap the parts that
 > read controller state, not the editor.
 
-## Concepts
+## Building an editor
+The pieces in the order a new editor meets them.
 
 ### The model
 
@@ -101,8 +102,16 @@ Four value types, all immutable:
 `type` and `data` are yours. The package never interprets them; your
 `nodeBuilder` switches on `type` and reads `data`. `metadata` is for what your
 *user* attaches to a node — notes, tags — kept apart from `data` because a
-prototype shapes `data` and may prune a key it stopped declaring; the editor
+definition shapes `data` and may prune a key it stopped declaring; the editor
 never reads it, and `controller.setNodeMetadata` is the one way to write it.
+
+**The names are the file's.** A node's `type` is the key a document stores and
+the one a definition claims; a port's `kind` is `data` or `control`, and its
+`dataType` is the tag wiring compares — three words, three different
+questions, each spelled the way the JSON spells it, so a script or another
+language reading a saved graph meets the same vocabulary as the Dart. The node
+is a `GraphNode` rather than a `Node` because `dart:html` and `package:web`
+already have one of those.
 
 ### The controller
 
@@ -119,7 +128,7 @@ subsystem:
 | `controller.layout` | `sizeOf`, `nodeAt`, `portAt`, `nodesIn`, `boundsOf`, `onMeasured` |
 | `controller.clipboard` | `copy`, `cut`, `paste`, `duplicate` |
 | `controller.project` | the open document: `save`, `load`, `open`, `reset`, `isDirty` |
-| `controller.runner` | `run`, `cancel`, `stateOf`, `onEvent` |
+| `controller.runner` | `run`, `cancel`, `stateOf`, `onEvent` — idle until asked; see [Execution](#execution) |
 | `controller.emphasis` | a focus: `value`, `clear`, `revision` |
 
 There is no compatibility layer: `controller.undo()` does not exist, only
@@ -182,7 +191,7 @@ Nodes declare a `width`. `height` is optional:
   frame; `controller.layout.hasUnmeasuredNodes` reports when extents are
   provisional.
 
-A prototype with `resizable: true` gets a grip in the node's bottom-right
+A definition with `resizable: true` gets a grip in the node's bottom-right
 corner, bounded by `minWidth`, `maxWidth` and `maxHeight`; with snapping on it
 is the dragged *edge* that is pulled onto a grid line, before those limits are
 applied. The width dragged is
@@ -227,21 +236,75 @@ portTooltip: (node, port) => port.dataType ?? 'anything',
 Returning null or an empty string says nothing for that port, so you can
 label the ones worth labelling and leave the rest alone.
 
+### Node types
+A `NodeDefinition` describes one `type`: what the Create menu shows for it, the
+fields a node of that type stores, and the ports it has. Register them and the
+controller keeps every node of that type in step with its definition.
+
+```dart
+final printNode = NodeDefinition(
+  type: 'print',
+  label: 'Print',                    // also its opt-in to the Create menu
+  icon: Icons.print,
+  category: 'Debug',
+  description: 'Writes its text to the log.',
+  fields: const <FieldFamily>[
+    StaticFieldFamily(
+      id: 'text',
+      fields: <NodeField>[NodeField(key: 'text', defaultValue: 'Hello!')],
+    ),
+  ],
+  ports: const <PortFamily>[
+    StaticPortFamily(
+      id: 'flow',
+      ports: <NodePort>[
+        NodePort.input(id: 'in', kind: PortKind.control),
+        NodePort.output(id: 'out', kind: PortKind.control),
+      ],
+    ),
+  ],
+);
+
+final definitions = NodeDefinitionRegistry(<NodeDefinition>[printNode]);
+final controller = NodeEditorController(definitions: definitions);
+controller.addNode(
+  definitions.instantiate('print', id: 'p1', position: Offset.zero),
+);
+```
+
+Definitions are optional. Without a registry the controller behaves exactly as
+it would otherwise, and a node whose `type` no definition claims is never
+touched. A node reads what its definition stores with
+`node.field<String>('text')`, which answers null rather than throwing when a
+saved file holds something else.
+
+`label`, `icon`, `category`, `description` and `defaultWidth` are presentation
+only and take no part in resolution — they are what the editor's Create menu
+lists and its Description item shows.
+
+Ports that depend on a node's fields or its wiring are
+[dynamic families](#dynamic-ports-and-fields).
+
 ### Connection rules
 
 By default the editor refuses same-direction pairs, self-connections,
 duplicates, anything over a port's `maxConnections`, and any pair whose kinds or
-types disagree. `connectionValidator` adds domain rules:
+types disagree. A `connectionValidator` sees every pair that is one output and
+one input on two nodes, as a `ConnectionCheck` — both `PortRef`s, both
+`NodePort`s, the graph — and its answer is final. To add a rule, and it in:
 
 ```dart
 NodeEditorController(
-  connectionValidator: (graph, from, to) =>
-      NodeEditorController.portsCompatible(fromPort, toPort) && myRule(...),
+  connectionValidator: (check) =>
+      check.allowedByDefault && check.toPort.label != 'locked',
 );
 ```
 
-A custom validator *replaces* the default, so call `portsCompatible` yourself if
-you still want the kind and type checks.
+`allowedByDefault` is the package's own verdict on duplicates, capacity and
+`portsCompatible`. A validator that does not read it replaces those checks,
+which is occasionally what you want and is now something you can see. It is a
+settable field, and a pasted wire is asked the same question as a drawn one —
+one that is refused stays behind, and its nodes still arrive.
 
 **Kinds and types.** A port is `PortKind.data` or `PortKind.control`. Data
 carries a value; control carries the flow of execution. They never join.
@@ -278,136 +341,89 @@ around cards: the waypoints are what a wire is taken around a card with, and a
 straight leg under a card shows it where a swoop does not — which is why
 curved is the default.
 
-### Prototypes
+### Undo and the clipboard
 
-A prototype is not a template stamped out once — it is a **reduction rule**.
-Given what a node's fields say and how it is wired *right now*, it returns the
-ports, fields and height that node should have, and the controller rewrites the
-node to match. Ports become derived state rather than something the document
-authors by hand.
-
-That is what lets ports appear on demand: one input per placeholder in a format
-string, one more exit each time the last free one is wired.
+Every mutation records a snapshot; multi-frame gestures wrap themselves in a
+transaction so a drag is one step.
 
 ```dart
-final printNode = NodePrototype(
-  type: 'print',
-  label: 'Print',                    // also its opt-in to the Create menu
-  icon: Icons.print,
-  category: 'Debug',
-  description: 'Writes its formatted text to the log.',
-  fields: const <FieldFamily>[
-    StaticFieldFamily(
-      id: 'text',
-      fields: <NodeField>[NodeField(key: 'format', defaultValue: 'Hello, {0}!')],
-    ),
-  ],
-  ports: <PortFamily>[
-    DynamicPortFamily(
-      id: 'args',
-      build: (context) => <NodePort>[
-        for (final slot in slotsIn(context.fieldOr<String>('format', '')))
-          NodePort.input(id: 'arg_$slot', label: '{$slot}'),
-      ],
-    ),
-  ],
-);
-
-NodeEditorController(prototypes: NodePrototypeRegistry(<NodePrototype>[printNode]));
+controller.history.beginTransaction();
+// ...many moveNodes calls...
+controller.history.commitTransaction();
 ```
 
-Prototypes are optional. Without a registry the controller behaves exactly as it
-would otherwise, and a node whose `type` no prototype claims is never touched.
+`copy` takes the selected nodes and the wires **between** them — a connection to
+a node left behind is not part of what was copied, and reattaching it on paste
+would silently rewire the document. `paste` gives fresh ids, runs one resolution
+pass, lands as one undo step, and returns what actually survived:
 
-**Families** are the unit of ownership, so a node can have a fixed input and a
-variadic output with only the second re-deriving:
+```dart
+controller.clipboard.copy();
+final pasted = controller.clipboard.paste();   // the ids that survived
+controller.clipboard.duplicate();              // buffer untouched
+```
 
-| | |
+Give the controller a `NodeGraphCodec` and every copy is *also* written to the
+system clipboard as JSON, which is what carries a selection between windows:
+
+```dart
+NodeEditorController(definitions: definitions, codec: NodeGraphCodec(definitions: definitions));
+await controller.clipboard.pasteFromSystem();  // falls back to the buffer
+```
+
+Without a codec the package never touches `flutter/services`.
+
+## Customising
+How it looks, and what it offers beyond nodes and wires.
+
+### Theming
+
+`NodeEditorTheme.dark()` / `.light()`, or build one field by field. It covers
+colours, the grid, connection width, curvature and style, port radius and
+`portMinScale`, selection and marquee styling, scale limits, hit tolerances and
+the direction markers. `gridSpacing` doubles as the step a snapped move lands
+on — see *Snapping* below. Omit `theme` and the editor picks dark or light from
+the ambient `Theme` brightness.
+
+### Context menus
+
+Right-click a node, a port, a wire or the canvas. Menus are built from
+`MenuAnchor`, so they inherit your app's `MenuTheme`.
+
+| Target | Entries |
 | --- | --- |
-| `StaticPortFamily` | A constant list, still owned — re-materialised every pass, so renaming a label in the prototype reaches nodes that already exist. |
-| `DynamicPortFamily` | Rebuilt from the node's fields and links on every pass. |
-| *foreign* | A port carrying no `family`. Yours; never rewritten or removed. |
+| Node | Cut, Copy, Delete, Group, Description |
+| Port | Cut links |
+| Wire | Go to source, Go to destination, Delete |
+| Group | Cut, Copy, Delete with contents, Disband, Rename, Colour ▸ |
+| Canvas | Center view, Reset zoom, Paste, Create ▸, Add comment, Project ▸ |
 
-If a generated port has the same id as a hand-authored one, the generated port
-adopts it — that is how you point a prototype at a document whose ports were
-written by hand.
+Create ▸ lists every definition that declares a `label`, grouped by `category`.
+Description shows a definition's `description`, read-only. Open and Save are
+disabled until `controller.project` has a `source` and a `sink`.
 
-A builder must **settle**: given its own output it must return the same thing
-again. Resolution runs passes until the node stops changing, bounded by
-`maxPasses`.
-
-`label`, `icon`, `category`, `description` and `defaultWidth` are presentation
-only and take no part in resolution — they are what the editor's Create menu
-lists and its Description item shows.
-
-### Execution
-
-A prototype's `onExecute` is what its node *does*; `controller.runner` walks the
-graph and calls them.
+Entries are data, so a host filters the defaults rather than rebuilding them:
 
 ```dart
-NodePrototype(
-  type: 'greet',
-  onExecute: (context) async {
-    final name = context.input<String>('name') ?? context.fieldOr('name', '');
-    context.emit('greeting', 'Hello, $name');
-    context.flow('then');
-  },
+NodeEditor(
+  contextMenus: NodeEditorMenus(
+    createOnDrop: true,
+    build: (request, defaults) => <NodeMenuEntry>[
+      ...defaults,
+      if (request.target case NodeMenuNodeTarget(:final node))
+        NodeMenuEntry(label: 'Run from here', onSelected: () => run(node.id)),
+    ],
+  ),
 );
-
-final run = await controller.runner.run();
-if (!run.succeeded) report(run.error, run.failedNodeId);
 ```
 
-**Running never touches the document.** No node moves, the revision does not
-change, nothing lands in undo and the project does not become dirty. Values live
-in the run, keyed by the output port that produced them — which is also why a
-run is immune to edits made while it is in flight: it works from a snapshot.
+`contextMenus: null` turns them off. Supplying `onNodeSecondaryTap`,
+`onPortSecondaryTap`, `onConnectionSecondaryTap` or `onCanvasSecondaryTap` takes
+that one target over, so a host with its own menu keeps it and does not get two.
 
-`run()` throws `StateError` if one is already going; `cancel()` stops it. An
-exception from an executor is **not** rethrown — it comes back as `run.error`
-with `run.failedNodeId`, because a result you can inspect beats an error thrown
-out of an async subsystem.
-
-**Control flow.** Execution starts at every node with a control output and
-nothing wired into its control input, in node-id order — or at the ids you pass
-as `from`. A node with no executor hands the flow on through its single control
-output; with more than one it stops and says so rather than guessing which
-branch an if/else meant. Branches run **depth first**.
-
-Control flow is a **pulse**: two branches converging on a node run it twice.
-There is no implicit join, because a barrier waiting for every incoming edge
-deadlocks on the arm a condition never fires. A node that wants to wait counts
-tokens in `context.state`, which persists across that node's turns within one
-run — the same place a loop keeps its counter. `maxSteps` bounds the run.
-
-**Data flow.** A node declaring no control ports at all is a **pure data node**:
-evaluated when something asks for its output, not when the flow arrives.
-
-```dart
-context.input<String>('name')   // null when nothing is wired
-context.hasInput('name')        // null is a legal value; absence is not
-context.inputs('name')          // every wire, in connection id order
-```
-
-Its result is reused until one of its own inputs is rewritten, so a value
-recomputed inside a loop is recomputed and a constant is not. A node that is not
-a function of its inputs — `random()`, `now()` — sets `pure: false`.
-
-`GraphRun` carries `trace`, `runCounts`, per-node `states`, `values` keyed by
-`PortRef`, `log` and `diagnostics` — the things that would otherwise be silent:
-a node that ran twice, a data input with several wires, a read from a producer
-that had not run, a graph with no entry point.
-
-**Watching a run as it happens.** `runner.onEvent` is handed a `GraphRunEvent`
-for every step — `RunStarted`, `NodeStarted`, `NodeFinished`, `MemoHit`,
-`DiagnosticRaised`, `LogEmitted`, `RunFinished` — a sealed hierarchy, so a
-`switch` is exhaustive. An executor says something into the same stream with
-`context.log(message)`. Values on the wires are withheld unless
-`runner.tracePayloads` is on, because a trace is the thing that gets written
-to a file and a value was produced by a node body the host did not write. The
-package keeps no log of its own: `GraphRunRecorder` is a fixture, and where the
-events go is the host's decision.
+`createOnDrop` (off by default) makes a wire dropped on empty canvas offer
+Create ▸ at that point and wire up what it makes, in one undo step. It replaces
+`onConnectionDropped` rather than joining it.
 
 ### Comments
 
@@ -534,77 +550,158 @@ The panel's placement, size, folded state and settings live on a
 `MinimapController`. The editor makes one when you supply none; own one to
 persist where the panel was left.
 
-### Context menus
-
-Right-click a node, a port, a wire or the canvas. Menus are built from
-`MenuAnchor`, so they inherit your app's `MenuTheme`.
-
-| Target | Entries |
-| --- | --- |
-| Node | Cut, Copy, Delete, Group, Description |
-| Port | Cut links |
-| Wire | Go to source, Go to destination, Delete |
-| Group | Cut, Copy, Delete with contents, Disband, Rename, Colour ▸ |
-| Canvas | Center view, Reset zoom, Paste, Create ▸, Add comment, Project ▸ |
-
-Create ▸ lists every prototype that declares a `label`, grouped by `category`.
-Description shows a prototype's `description`, read-only. Open and Save are
-disabled until `controller.project` has a `source` and a `sink`.
-
-Entries are data, so a host filters the defaults rather than rebuilding them:
+### Snapping
 
 ```dart
-NodeEditor(
-  contextMenus: NodeEditorMenus(
-    createOnDrop: true,
-    build: (request, defaults) => <NodeMenuEntry>[
-      ...defaults,
-      if (request.target case NodeMenuNodeTarget(:final node))
-        NodeMenuEntry(label: 'Run from here', onSelected: () => run(node.id)),
-    ],
-  ),
+controller.snapToGrid = true;
+```
+
+A node's top-left corner then lands on the grid the canvas draws — a drag, an
+arrow-key nudge, the corner grip and a dragged waypoint all take it, and each
+node in a selection rounds its own corner. **The step is not a number of its
+own**: it is `NodeEditorTheme.gridSpacing`, which the editor hands the
+controller, so what a card lands on is a line you can see. `snapStep` is that
+value resolved, and `0` whenever nothing snaps.
+
+It is on the controller rather than the theme so that turning it on does not
+mean handing `NodeEditor` a new theme, which is the rebuild the callout near
+the top of this file warns about. Three things it deliberately leaves alone:
+`Shift` and an arrow place a node exactly, ignoring the grid; an orthogonal
+waypoint lined up with its neighbour's row stays lined up, since a corner with
+no jog beats a corner on a line; and `applyLayout` never snaps, because an
+arrangement is a computed picture rather than something a pointer expressed. `GridSnap.offset` is the rounding, public, so a host that
+places a node itself can reach the same answer:
+
+```dart
+controller.applyLayout(
+  (graph, sizeOf) => myLayout(graph, sizeOf)
+      .map((id, at) => MapEntry(id, GridSnap.offset(at, 24))),
 );
 ```
 
-`contextMenus: null` turns them off. Supplying `onNodeSecondaryTap`,
-`onPortSecondaryTap`, `onConnectionSecondaryTap` or `onCanvasSecondaryTap` takes
-that one target over, so a host with its own menu keeps it and does not get two.
+Snapping is independent of `showGrid`: the lattice is a fact about the scene,
+not about what is painted.
 
-`createOnDrop` (off by default) makes a wire dropped on empty canvas offer
-Create ▸ at that point and wire up what it makes, in one undo step. It replaces
-`onConnectionDropped` rather than joining it.
+## Advanced
+None of this is needed to draw and edit a graph.
 
-### Undo and the clipboard
+### Dynamic ports and fields
 
-Every mutation records a snapshot; multi-frame gestures wrap themselves in a
-transaction so a drag is one step.
+A definition is not a template stamped out once, as a prototype would be — it
+is a **reduction rule**. Given what a node's fields say and how it is wired *right now*, it returns the
+ports, fields and height that node should have, and the controller rewrites the
+node to match. Ports become derived state rather than something the document
+authors by hand.
 
-```dart
-controller.history.beginTransaction();
-// ...many moveNodes calls...
-controller.history.commitTransaction();
-```
-
-`copy` takes the selected nodes and the wires **between** them — a connection to
-a node left behind is not part of what was copied, and reattaching it on paste
-would silently rewire the document. `paste` gives fresh ids, runs one resolution
-pass, lands as one undo step, and returns what actually survived:
+That is what lets ports appear on demand: one input per placeholder in a format
+string, one more exit each time the last free one is wired.
 
 ```dart
-controller.clipboard.copy();
-final pasted = controller.clipboard.paste();   // the ids that survived
-controller.clipboard.duplicate();              // buffer untouched
+final formatNode = NodeDefinition(
+  type: 'format',
+  fields: const <FieldFamily>[
+    StaticFieldFamily(
+      id: 'text',
+      fields: <NodeField>[NodeField(key: 'format', defaultValue: 'Hello, {0}!')],
+    ),
+  ],
+  ports: <PortFamily>[
+    DynamicPortFamily(
+      id: 'args',
+      build: (context) => <NodePort>[
+        for (final slot in slotsIn(context.fieldOr<String>('format', '')))
+          NodePort.input(id: 'arg_$slot', label: '{$slot}'),
+      ],
+    ),
+  ],
+);
 ```
 
-Give the controller a `NodeGraphCodec` and every copy is *also* written to the
-system clipboard as JSON, which is what carries a selection between windows:
+**Families** are the unit of ownership, so a node can have a fixed input and a
+variadic output with only the second re-deriving:
+
+| | |
+| --- | --- |
+| `StaticPortFamily` | A constant list, still owned — re-materialised every pass, so renaming a label in the definition reaches nodes that already exist. |
+| `DynamicPortFamily` | Rebuilt from the node's fields and links on every pass. |
+| *foreign* | A port carrying no `family`. Yours; never rewritten or removed. |
+
+If a generated port has the same id as a hand-authored one, the generated port
+adopts it — that is how you point a definition at a document whose ports were
+written by hand.
+
+A builder must **settle**: given its own output it must return the same thing
+again. Resolution runs passes until the node stops changing, bounded by
+`maxPasses`.
+
+### Execution
+
+A definition's `onExecute` is what its node *does*; `controller.runner` walks the
+graph and calls them.
 
 ```dart
-NodeEditorController(prototypes: prototypes, codec: NodeGraphCodec(prototypes: prototypes));
-await controller.clipboard.pasteFromSystem();  // falls back to the buffer
+NodeDefinition(
+  type: 'greet',
+  onExecute: (context) async {
+    final name = context.input<String>('name') ?? context.fieldOr('name', '');
+    context.emit('greeting', 'Hello, $name');
+    context.flow('then');
+  },
+);
+
+final run = await controller.runner.run();
+if (!run.succeeded) report(run.error, run.failedNodeId);
 ```
 
-Without a codec the package never touches `flutter/services`.
+**Running never touches the document.** No node moves, the revision does not
+change, nothing lands in undo and the project does not become dirty. Values live
+in the run, keyed by the output port that produced them — which is also why a
+run is immune to edits made while it is in flight: it works from a snapshot.
+
+`run()` throws `StateError` if one is already going; `cancel()` stops it. An
+exception from an executor is **not** rethrown — it comes back as `run.error`
+with `run.failedNodeId`, because a result you can inspect beats an error thrown
+out of an async subsystem.
+
+**Control flow.** Execution starts at every node with a control output and
+nothing wired into its control input, in node-id order — or at the ids you pass
+as `from`. A node with no executor hands the flow on through its single control
+output; with more than one it stops and says so rather than guessing which
+branch an if/else meant. Branches run **depth first**.
+
+Control flow is a **pulse**: two branches converging on a node run it twice.
+There is no implicit join, because a barrier waiting for every incoming edge
+deadlocks on the arm a condition never fires. A node that wants to wait counts
+tokens in `context.state`, which persists across that node's turns within one
+run — the same place a loop keeps its counter. `maxSteps` bounds the run.
+
+**Data flow.** A node declaring no control ports at all is a **pure data node**:
+evaluated when something asks for its output, not when the flow arrives.
+
+```dart
+context.input<String>('name')   // null when nothing is wired
+context.hasInput('name')        // null is a legal value; absence is not
+context.inputs('name')          // every wire, in connection id order
+```
+
+Its result is reused until one of its own inputs is rewritten, so a value
+recomputed inside a loop is recomputed and a constant is not. A node that is not
+a function of its inputs — `random()`, `now()` — sets `pure: false`.
+
+`GraphRun` carries `trace`, `runCounts`, per-node `states`, `values` keyed by
+`PortRef`, `log` and `diagnostics` — the things that would otherwise be silent:
+a node that ran twice, a data input with several wires, a read from a producer
+that had not run, a graph with no entry point.
+
+**Watching a run as it happens.** `runner.onEvent` is handed a `GraphRunEvent`
+for every step — `RunStarted`, `NodeStarted`, `NodeFinished`, `MemoHit`,
+`DiagnosticRaised`, `LogEmitted`, `RunFinished` — a sealed hierarchy, so a
+`switch` is exhaustive. An executor says something into the same stream with
+`context.log(message)`. Values on the wires are withheld unless
+`runner.tracePayloads` is on, because a trace is the thing that gets written
+to a file and a value was produced by a node body the host did not write. The
+package keeps no log of its own: `GraphRunRecorder` is a fixture, and where the
+events go is the host's decision.
 
 ### Serialisation
 
@@ -669,47 +766,6 @@ gates run on the way in, the format's first; a missing `schema` reads as 1, and
 leaving `schemaVersion` null means a `schema` key is carried through untouched
 rather than gated.
 
-### Theming
-
-`NodeEditorTheme.dark()` / `.light()`, or build one field by field. It covers
-colours, the grid, connection width, curvature and style, port radius and
-`portMinScale`, selection and marquee styling, scale limits, hit tolerances and
-the direction markers. `gridSpacing` doubles as the step a snapped move lands
-on — see *Snapping* below. Omit `theme` and the editor picks dark or light from
-the ambient `Theme` brightness.
-
-### Snapping
-
-```dart
-controller.snapToGrid = true;
-```
-
-A node's top-left corner then lands on the grid the canvas draws — a drag, an
-arrow-key nudge, the corner grip and a dragged waypoint all take it, and each
-node in a selection rounds its own corner. **The step is not a number of its
-own**: it is `NodeEditorTheme.gridSpacing`, which the editor hands the
-controller, so what a card lands on is a line you can see. `snapStep` is that
-value resolved, and `0` whenever nothing snaps.
-
-It is on the controller rather than the theme so that turning it on does not
-mean handing `NodeEditor` a new theme, which is the rebuild the callout near
-the top of this file warns about. Three things it deliberately leaves alone:
-`Shift` and an arrow place a node exactly, ignoring the grid; an orthogonal
-waypoint lined up with its neighbour's row stays lined up, since a corner with
-no jog beats a corner on a line; and `applyLayout` never snaps, because an
-arrangement is a computed picture rather than something a pointer expressed. `GridSnap.offset` is the rounding, public, so a host that
-places a node itself can reach the same answer:
-
-```dart
-controller.applyLayout(
-  (graph, sizeOf) => myLayout(graph, sizeOf)
-      .map((id, at) => MapEntry(id, GridSnap.offset(at, 24))),
-);
-```
-
-Snapping is independent of `showGrid`: the lattice is a fact about the scene,
-not about what is painted.
-
 ## Interaction
 
 | Gesture | Result |
@@ -752,7 +808,7 @@ without pumping a widget.
 | --- | --- | --- |
 | Model | `NodeGraph`, `GraphNode`, `NodePort`, `NodeConnection`, `NodeGroup`, `PortRef` | geometry only |
 | Geometry | `ViewportTransform`, `NodeGeometry`, `ConnectionPath`, `ConnectionRouter`, `MinimapProjection` | geometry only |
-| Prototype | `NodePrototype`, `PortFamily`, `FieldFamily`, `NodePrototypeRegistry` | geometry only |
+| Definition | `NodeDefinition`, `PortFamily`, `FieldFamily`, `NodeDefinitionRegistry` | geometry only |
 | Serialisation | `NodeGraphCodec`, `GraphDocument`, `PayloadCodecs` | geometry only |
 | Controller | `NodeEditorController` and its subsystems, `SpatialHashGrid`, `MinimapController` | `ChangeNotifier` |
 | View | `NodeEditor`, `NodeView`, `ConnectionLayout`, painters, `NodeEditorTheme`, `MinimapConfig` | yes |
@@ -775,10 +831,10 @@ cd example && flutter run
 - An arrangement of its own. `applyLayout` takes one from the host and places
   it; which picture a graph should make is a question about what the nodes
   mean.
-- Resizing a comment. It sizes itself to its text; only a node whose prototype
+- Resizing a comment. It sizes itself to its text; only a node whose definition
   opts in can be resized by hand.
 - Resolution cannot change a node's `position`, `width` or `draggable`.
-  `NodePrototype.defaultWidth` seeds `instantiate` but is not enforced after.
+  `NodeDefinition.defaultWidth` seeds `instantiate` but is not enforced after.
 
 ## License
 

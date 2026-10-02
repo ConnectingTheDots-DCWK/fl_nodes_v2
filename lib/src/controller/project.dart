@@ -43,7 +43,7 @@ class NodeEditorProject {
   /// The codec documents are converted with.
   ///
   /// Falls back to a plain one when the controller was given none. A codec
-  /// without prototypes still round-trips correctly; all it loses is the
+  /// without definitions still round-trips correctly; all it loses is the
   /// chance to leave out data it could prove was derived.
   NodeGraphCodec get codec => _codec ?? const NodeGraphCodec();
 

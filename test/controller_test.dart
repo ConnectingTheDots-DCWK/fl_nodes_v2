@@ -155,16 +155,50 @@ void main() {
       );
     });
 
-    test('honours a custom validator', () {
-      final controller = NodeEditorController(
-        graph: NodeGraph(nodes: <GraphNode>[node('a'), node('b')]),
-        connectionValidator: (graph, from, to) => to.nodeId != 'b',
+    test('a validator adds to the default checks, or replaces them', () {
+      List<GraphNode> nodes() => <GraphNode>[
+        node('a'),
+        node('b'),
+        node(
+          'c',
+          ports: const <NodePort>[NodePort.input(id: 'in', maxConnections: 1)],
+        ),
+      ];
+      const out = PortRef('a', 'out');
+      const capped = PortRef('c', 'in');
+
+      final adding = NodeEditorController(
+        graph: NodeGraph(nodes: nodes()),
+        connectionValidator: (check) =>
+            check.allowedByDefault && check.to.nodeId != 'b',
+      );
+      addTearDown(adding.dispose);
+      expect(adding.connect(out, const PortRef('b', 'in')), isNull);
+      expect(adding.connect(out, capped), isNotNull);
+      expect(
+        adding.canConnect(out, capped),
+        isFalse,
+        reason: 'a rule anded in keeps the duplicate and capacity checks',
       );
 
-      expect(
-        controller.connect(const PortRef('a', 'out'), const PortRef('b', 'in')),
-        isNull,
+      ConnectionCheck? seen;
+      final replacing = NodeEditorController(
+        graph: NodeGraph(nodes: nodes()),
+        connectionValidator: (check) {
+          seen = check;
+          return true;
+        },
       );
+      addTearDown(replacing.dispose);
+      expect(replacing.connect(const PortRef('c', 'in'), out), isNotNull);
+      expect(
+        replacing.connect(out, capped),
+        isNotNull,
+        reason: 'ignoring allowedByDefault is replacing it, on purpose',
+      );
+      expect(seen!.allowedByDefault, isFalse);
+      expect(seen!.from, out, reason: 'the pair arrives output first');
+      expect(seen!.fromPort.isOutput && seen!.toPort.isInput, isTrue);
     });
   });
 
@@ -515,12 +549,12 @@ void main() {
     );
   });
 
-  group('prototypes', () {
+  group('definitions', () {
     final placeholder = RegExp(r'\{(\d+)\}');
 
     /// One input per placeholder in `format`, plus a fixed output.
-    NodePrototype formatPrototype({NodeHeightResolver? resolveHeight}) =>
-        NodePrototype(
+    NodeDefinition formatDefinition({NodeHeightResolver? resolveHeight}) =>
+        NodeDefinition(
           type: 'format',
           resolveHeight: resolveHeight,
           ports: <PortFamily>[
@@ -541,7 +575,7 @@ void main() {
         );
 
     /// Keeps every wired exit and always leaves one free.
-    NodePrototype fanOutPrototype() => NodePrototype(
+    NodeDefinition fanOutDefinition() => NodeDefinition(
       type: 'fanout',
       ports: <PortFamily>[
         const StaticPortFamily(
@@ -576,7 +610,9 @@ void main() {
 
     test('adding a node derives its ports', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
 
@@ -595,7 +631,9 @@ void main() {
             seed('a', data: <String, Object?>{'format': '{0} {1}'}),
           ],
         ),
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
 
@@ -605,8 +643,8 @@ void main() {
     test('editing a field re-derives the ports, dragging does not', () {
       var builds = 0;
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          NodePrototype(
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          NodeDefinition(
             type: 'format',
             ports: <PortFamily>[
               DynamicPortFamily(
@@ -648,8 +686,8 @@ void main() {
     test('a metadata edit does not enter the resolver', () {
       var builds = 0;
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          NodePrototype(
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          NodeDefinition(
             type: 'format',
             ports: <PortFamily>[
               DynamicPortFamily(
@@ -677,7 +715,7 @@ void main() {
       expect(
         builds,
         afterAdd,
-        reason: 'nothing a prototype answers reads metadata',
+        reason: 'nothing a definition answers reads metadata',
       );
       expect(portIds(controller, 'a'), <String>['arg_0']);
       expect(controller.graph.node('a')!.metadata, <String, Object?>{
@@ -687,9 +725,9 @@ void main() {
 
     test('wiring the last exit spawns another', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          fanOutPrototype(),
-          formatPrototype(),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          fanOutDefinition(),
+          formatDefinition(),
         ]),
       );
       addTearDown(controller.dispose);
@@ -707,9 +745,9 @@ void main() {
 
     test('removing a connection lets the far node shrink again', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          fanOutPrototype(),
-          formatPrototype(),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          fanOutDefinition(),
+          formatDefinition(),
         ]),
       );
       addTearDown(controller.dispose);
@@ -727,9 +765,9 @@ void main() {
 
     test('deleting a node lets its neighbour shrink again', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          fanOutPrototype(),
-          formatPrototype(),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          fanOutDefinition(),
+          formatDefinition(),
         ]),
       );
       addTearDown(controller.dispose);
@@ -750,8 +788,8 @@ void main() {
       // A family that refuses to keep any port once it is wired: the
       // connection is made and then resolved away in the same mutation.
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          NodePrototype(
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          NodeDefinition(
             type: 'shy',
             ports: <PortFamily>[
               DynamicPortFamily(
@@ -763,7 +801,7 @@ void main() {
               ),
             ],
           ),
-          formatPrototype(),
+          formatDefinition(),
         ]),
       );
       addTearDown(controller.dispose);
@@ -785,8 +823,8 @@ void main() {
 
     test('a resolution that changes the height patches the spatial index', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          formatPrototype(
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(
             resolveHeight: (context) =>
                 40 + 30.0 * context.portsOf('args').length,
           ),
@@ -811,9 +849,9 @@ void main() {
 
     test('a port and the wire it loses come back in one undo', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[
-          formatPrototype(),
-          fanOutPrototype(),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+          fanOutDefinition(),
         ]),
       );
       addTearDown(controller.dispose);
@@ -843,7 +881,9 @@ void main() {
 
     test('field edits inside a transaction collapse to one undo step', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
       controller.addNode(seed('a', data: <String, Object?>{'format': ''}));
@@ -868,9 +908,11 @@ void main() {
       );
     });
 
-    test('an edit the prototype undoes is a true no-op', () {
+    test('an edit the definition undoes is a true no-op', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
       controller.addNode(seed('a', data: <String, Object?>{'format': '{0}'}));
@@ -879,7 +921,7 @@ void main() {
       var notifications = 0;
       controller.addListener(() => notifications++);
 
-      // A rogue port stamped with a family the prototype owns: the family is
+      // A rogue port stamped with a family the definition owns: the family is
       // rebuilt from the format string, so this resolves straight back out and
       // there is nothing to record.
       controller.updateNode(
@@ -899,13 +941,15 @@ void main() {
 
     test('swapping the registry re-normalises the document', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
       controller.addNode(seed('a', data: <String, Object?>{'format': '{0}'}));
 
-      controller.prototypes = NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+      controller.definitions = NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'format',
           ports: <PortFamily>[
             const StaticPortFamily(
@@ -925,7 +969,9 @@ void main() {
 
     test('revalidate records no history by default', () {
       final controller = NodeEditorController(
-        prototypes: NodePrototypeRegistry(<NodePrototype>[formatPrototype()]),
+        definitions: NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
+        ]),
       );
       addTearDown(controller.dispose);
       controller.addNode(seed('a', data: <String, Object?>{'format': '{0}'}));
@@ -937,10 +983,10 @@ void main() {
     });
 
     test('a controller with no registry behaves exactly as it did', () {
-      NodeGraph run(NodePrototypeRegistry? prototypes) {
+      NodeGraph run(NodeDefinitionRegistry? definitions) {
         final controller = NodeEditorController(
           graph: NodeGraph(nodes: <GraphNode>[node('a'), node('b')]),
-          prototypes: prototypes,
+          definitions: definitions,
         );
         addTearDown(controller.dispose);
         controller.connect(const PortRef('a', 'out'), const PortRef('b', 'in'));
@@ -952,7 +998,7 @@ void main() {
         return controller.graph;
       }
 
-      expect(run(null), run(NodePrototypeRegistry.empty));
+      expect(run(null), run(NodeDefinitionRegistry.empty));
     });
   });
 }

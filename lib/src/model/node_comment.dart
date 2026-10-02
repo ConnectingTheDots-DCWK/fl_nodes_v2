@@ -15,7 +15,7 @@ import 'graph_node.dart';
 /// surprised by one arriving. It carries no ports, which is what keeps it out
 /// of the runner: a node declaring no control ports sits outside the flow.
 abstract final class NodeComment {
-  /// Reserved. Registering a prototype for it, or authoring a node of this
+  /// Reserved. Registering a definition for it, or authoring a node of this
   /// type by hand, is not supported — call [create].
   static const String type = '__comment__';
 

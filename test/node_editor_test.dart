@@ -743,7 +743,7 @@ void main() {
     expect(controller.graph.nodes, isEmpty);
   });
 
-  testWidgets('a port spawned by a prototype is live in the tree', (
+  testWidgets('a port spawned by a definition is live in the tree', (
     tester,
   ) async {
     final controller = NodeEditorController(
@@ -765,8 +765,8 @@ void main() {
           ),
         ],
       ),
-      prototypes: NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+      definitions: NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'fanout',
           ports: <PortFamily>[
             DynamicPortFamily(

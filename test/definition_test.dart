@@ -11,12 +11,12 @@ void main() {
   }.toList()..sort();
 
   /// One input per placeholder in `format`, plus a fixed output.
-  NodePrototype formatPrototype({
+  NodeDefinition formatDefinition({
     NodeHeightResolver? resolveHeight,
     PortRemovalHandler? onPortsRemoved,
     NodeFieldMerge? inheritFields,
   }) {
-    return NodePrototype(
+    return NodeDefinition(
       type: 'format',
       resolveHeight: resolveHeight,
       onPortsRemoved: onPortsRemoved ?? NodePortRemoval.dropConnections,
@@ -45,8 +45,8 @@ void main() {
 
   /// Keeps every wired exit and always leaves one free, so wiring the last one
   /// grows the family.
-  NodePrototype fanOutPrototype() {
-    return NodePrototype(
+  NodeDefinition fanOutDefinition() {
+    return NodeDefinition(
       type: 'fanout',
       ports: <PortFamily>[
         const StaticPortFamily(
@@ -84,9 +84,9 @@ void main() {
   ];
 
   group('ownership', () {
-    test('a node with no prototype is returned untouched', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+    test('a node with no definition is returned untouched', () {
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final original = node('a', type: 'unknown');
       final graph = NodeGraph(nodes: <GraphNode>[original]);
@@ -105,15 +105,15 @@ void main() {
         ],
       );
 
-      final result = NodePrototypeRegistry.empty.resolveAll(graph);
+      final result = NodeDefinitionRegistry.empty.resolveAll(graph);
 
       expect(result.isUnchanged, isTrue);
       expect(identical(result.graph, graph), isTrue);
     });
 
     test('resolution keeps a node\'s metadata', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final notes = <String, Object?>{
         'note': 'hello',
@@ -134,8 +134,8 @@ void main() {
     });
 
     test('a static family materialises on a node added with no ports', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final graph = NodeGraph(nodes: <GraphNode>[node('a')]);
 
@@ -150,12 +150,12 @@ void main() {
     });
 
     test('a generated port adopts a hand-authored one with the same id', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final graph = NodeGraph(
         nodes: <GraphNode>[
-          // Authored before the prototype existed: 'out' is exactly what the
+          // Authored before the definition existed: 'out' is exactly what the
           // static family declares.
           node('a', ports: const <NodePort>[NodePort.output(id: 'out')]),
         ],
@@ -171,15 +171,15 @@ void main() {
       expect(
         resolved.node('a')!.portById('out')!.family,
         'flow',
-        reason: 'the prototype takes it over, which is the migration path',
+        reason: 'the definition takes it over, which is the migration path',
       );
     });
 
     test(
-      'ports the prototype does not own survive, after the generated ones',
+      'ports the definition does not own survive, after the generated ones',
       () {
-        final registry = NodePrototypeRegistry(<NodePrototype>[
-          formatPrototype(),
+        final registry = NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
         ]);
         final graph = NodeGraph(
           nodes: <GraphNode>[
@@ -202,8 +202,8 @@ void main() {
 
   group('format string ports', () {
     test('placeholders become inputs', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final graph = NodeGraph(
         nodes: <GraphNode>[
@@ -218,8 +218,8 @@ void main() {
     });
 
     test('resolving twice changes nothing', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
       ]);
       final graph = NodeGraph(
         nodes: <GraphNode>[
@@ -234,9 +234,9 @@ void main() {
     });
 
     test('losing a placeholder drops the port and its connection at once', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
-        fanOutPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
+        fanOutDefinition(),
       ]);
       var graph = NodeGraph(
         nodes: <GraphNode>[
@@ -272,8 +272,8 @@ void main() {
 
   group('variadic outputs', () {
     test('a fresh node starts with exactly one free exit', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        fanOutPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        fanOutDefinition(),
       ]);
       final graph = NodeGraph(nodes: <GraphNode>[node('r', type: 'fanout')]);
 
@@ -283,9 +283,9 @@ void main() {
     });
 
     test('wiring the last exit spawns another, repeatedly', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        fanOutPrototype(),
-        formatPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        fanOutDefinition(),
+        formatDefinition(),
       ]);
       var graph = NodeGraph(
         nodes: <GraphNode>[
@@ -339,9 +339,9 @@ void main() {
     test(
       'disconnecting a middle exit removes it and keeps the tail id stable',
       () {
-        final registry = NodePrototypeRegistry(<NodePrototype>[
-          fanOutPrototype(),
-          formatPrototype(),
+        final registry = NodeDefinitionRegistry(<NodeDefinition>[
+          fanOutDefinition(),
+          formatDefinition(),
         ]);
         var graph = NodeGraph(
           nodes: <GraphNode>[
@@ -393,9 +393,9 @@ void main() {
 
   group('cascade', () {
     test('a pruned wire re-resolves the node at the other end', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
-        fanOutPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
+        fanOutDefinition(),
       ]);
       var graph = NodeGraph(
         nodes: <GraphNode>[
@@ -439,8 +439,8 @@ void main() {
 
   group('port removal handling', () {
     test('a handler can rewire instead of dropping', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(
           onPortsRemoved: (removal) {
             var graph = removal.graph;
             for (final connection in removal.affected) {
@@ -451,7 +451,7 @@ void main() {
             return graph;
           },
         ),
-        fanOutPrototype(),
+        fanOutDefinition(),
       ]);
       var graph = NodeGraph(
         nodes: <GraphNode>[
@@ -479,10 +479,10 @@ void main() {
       expect(result.graph.connection('c1')!.to, const PortRef('a', 'arg_0'));
     });
 
-    test('a wire onto a port no prototype creates is swept away', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(),
-        fanOutPrototype(),
+    test('a wire onto a port no definition creates is swept away', () {
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(),
+        fanOutDefinition(),
       ]);
       // As a loaded document arrives: the fan-out carries no ports, and a wire
       // already references an exit that resolution is not going to produce.
@@ -514,9 +514,9 @@ void main() {
     });
 
     test('a handler that keeps everything still leaves nothing dangling', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(onPortsRemoved: NodePortRemoval.keep),
-        fanOutPrototype(),
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(onPortsRemoved: NodePortRemoval.keep),
+        fanOutDefinition(),
       ]);
       var graph = NodeGraph(
         nodes: <GraphNode>[
@@ -552,8 +552,8 @@ void main() {
 
   group('field inheritance', () {
     test('seedAndPrune seeds, retains, and only drops what it manages', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'args',
           fields: <FieldFamily>[
             DynamicFieldFamily(
@@ -609,13 +609,13 @@ void main() {
         data['title'],
         'kept',
         reason:
-            'keys outside a managed prefix are none of the prototype\'s business',
+            'keys outside a managed prefix are none of the definition\'s business',
       );
     });
 
     test('a custom merge can renumber values instead of orphaning them', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'args',
           // Inserting a placeholder at the front should carry the old values
           // up rather than seed a default and orphan them — a policy no
@@ -683,8 +683,8 @@ void main() {
 
   group('height', () {
     test('a declared height can track the port count', () {
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        formatPrototype(
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        formatDefinition(
           resolveHeight: (context) =>
               40 + 20.0 * context.portsOf('args').length,
         ),
@@ -710,10 +710,10 @@ void main() {
     });
 
     test(
-      'a prototype with no height resolver leaves the node measuring itself',
+      'a definition with no height resolver leaves the node measuring itself',
       () {
-        final registry = NodePrototypeRegistry(<NodePrototype>[
-          formatPrototype(),
+        final registry = NodeDefinitionRegistry(<NodeDefinition>[
+          formatDefinition(),
         ]);
         final graph = NodeGraph(
           nodes: <GraphNode>[
@@ -741,8 +741,8 @@ void main() {
   group('convergence', () {
     test('a builder that never repeats is reported, not hung', () {
       final diverged = <String>[];
-      final registry = NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+      final registry = NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'unstable',
           ports: <PortFamily>[
             DynamicPortFamily(
@@ -771,7 +771,9 @@ void main() {
   });
 
   test('instantiate builds a node without a controller', () {
-    final registry = NodePrototypeRegistry(<NodePrototype>[formatPrototype()]);
+    final registry = NodeDefinitionRegistry(<NodeDefinition>[
+      formatDefinition(),
+    ]);
 
     final built = registry.instantiate(
       'format',
@@ -789,7 +791,9 @@ void main() {
   });
 
   test('fieldsOf reports what a node declares right now', () {
-    final registry = NodePrototypeRegistry(<NodePrototype>[formatPrototype()]);
+    final registry = NodeDefinitionRegistry(<NodeDefinition>[
+      formatDefinition(),
+    ]);
     final graph = NodeGraph(
       nodes: <GraphNode>[
         node('a', data: <String, Object?>{'format': '{0}'}),

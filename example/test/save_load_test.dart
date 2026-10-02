@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 import 'package:fl_nodes_v2_example/main.dart';
-import 'package:fl_nodes_v2_example/prototype_nodes.dart';
+import 'package:fl_nodes_v2_example/definition_nodes.dart';
 import 'package:fl_nodes_v2_example/sample_graph.dart';
 
 void main() {
@@ -49,9 +49,9 @@ void main() {
   }
 
   test('the demo document survives a round trip', () {
-    final codec = NodeGraphCodec(prototypes: workflowPrototypes);
+    final codec = NodeGraphCodec(definitions: workflowDefinitions);
     // As the controller would hold it: authored, then normalised.
-    final resolved = workflowPrototypes.resolveAll(buildSampleGraph()).graph;
+    final resolved = workflowDefinitions.resolveAll(buildSampleGraph()).graph;
 
     final reloaded = codec
         .decode(codec.encode(GraphDocument(graph: resolved)))
@@ -59,7 +59,7 @@ void main() {
 
     final controller = NodeEditorController(
       graph: reloaded,
-      prototypes: workflowPrototypes,
+      definitions: workflowDefinitions,
     );
     addTearDown(controller.dispose);
 

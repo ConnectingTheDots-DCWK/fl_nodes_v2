@@ -91,7 +91,7 @@ class NodeEditorClipboard {
 
   /// Pastes the buffer and selects the result.
   ///
-  /// Returns the ids of the nodes that actually landed. A prototype resolves
+  /// Returns the ids of the nodes that actually landed. A definition resolves
   /// the pasted nodes on the way in and is free to prune one, so this is the
   /// honest answer rather than the ids that were attempted.
   ///
@@ -142,6 +142,38 @@ class NodeEditorClipboard {
   // ---------------------------------------------------------------- copying
 
   /// Builds a fragment from [ids], or null when none of them exist.
+  /// The pasted [wires] the controller's rules allow, in their own order.
+  ///
+  /// A fragment can come from clipboard text — another document, another
+  /// build, a hand edit — so its wires are asked exactly what a drawn one is,
+  /// and a refused one stays behind while its nodes still arrive. They are
+  /// judged against the graph *resolved*, because a definition may store no
+  /// ports in the text and derive some from the very wires being judged; and
+  /// admitted one at a time, so two that each fit a port alone cannot fill it
+  /// past its limit together.
+  List<NodeConnection> _admitted(
+    NodeGraph withoutWires,
+    List<NodeConnection> wires,
+    List<String> pasted,
+  ) {
+    if (wires.isEmpty) return wires;
+    final definitions = _controller._definitions;
+    final whole = withoutWires.putConnections(wires);
+    var judged = definitions.isEmpty
+        ? whole
+        : definitions.resolve(whole, seeds: pasted).graph;
+    judged = judged.removeConnections(<String>[for (final w in wires) w.id]);
+    final kept = <NodeConnection>[];
+    for (final wire in wires) {
+      if (_controller._normalize(wire.from, wire.to, graph: judged) == null) {
+        continue;
+      }
+      judged = judged.putConnection(wire);
+      kept.add(wire);
+    }
+    return kept;
+  }
+
   GraphFragment? _fragmentOf(Set<String> ids) {
     final graph = _controller._graph;
     final nodes = <GraphNode>[
@@ -221,8 +253,8 @@ class NodeEditorClipboard {
         ),
       );
     }
-    for (final connection in fragment.graph.connections.values) {
-      next = next.putConnection(
+    final wires = <NodeConnection>[
+      for (final connection in fragment.graph.connections.values)
         connection.copyWith(
           id: _controller.nextId('connection'),
           from: PortRef(ids[connection.from.nodeId]!, connection.from.portId),
@@ -231,12 +263,12 @@ class NodeEditorClipboard {
             for (final point in connection.waypoints) base + point,
           ],
         ),
-      );
-    }
-
+    ];
     final pasted = ids.values.toList(growable: false);
+    next = next.putConnections(_admitted(next, wires, pasted));
+
     // One mutation, so one undo step — and one resolution pass, which is what
-    // gives a pasted node its prototype-owned ports back. A family derived
+    // gives a pasted node its definition-owned ports back. A family derived
     // from link state resolves against the wires that came along, so a node
     // copied without them legitimately arrives smaller than it left.
     _controller._mutate(
