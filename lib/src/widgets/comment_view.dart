@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller/node_editor_controller.dart';
+import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
 import '../model/node_comment.dart';
 import 'node_editor_scope.dart';
@@ -153,7 +154,7 @@ class _CommentViewState extends State<CommentView> {
             // Explicit, not inherited: see [CommentView].
             filled: false,
             contentPadding: EdgeInsets.zero,
-            hintText: 'Comment',
+            hintText: NodeEditorLocalizations.of(context).commentHint,
             hintStyle: TextStyle(
               color: palette.placeholder,
               fontSize: _fontSize,

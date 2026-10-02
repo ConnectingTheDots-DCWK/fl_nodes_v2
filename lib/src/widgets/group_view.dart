@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/node_editor_localizations.dart';
 import '../model/node_group.dart';
 import '../theme/node_editor_theme.dart';
 
@@ -234,7 +235,7 @@ class _ColorMenu extends StatelessWidget {
         MenuItemButton(
           leadingIcon: const _Swatch(color: NodeGroup.neutralColor),
           onPressed: () => onPicked(null),
-          child: const Text('Neutral'),
+          child: Text(NodeEditorLocalizations.of(context).neutralColour),
         ),
         for (final swatch in NodeGroup.palette)
           MenuItemButton(

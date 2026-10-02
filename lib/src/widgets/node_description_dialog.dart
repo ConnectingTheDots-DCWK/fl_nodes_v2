@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/node_editor_localizations.dart';
+
 /// Shows a node's description, read-only.
 ///
 /// A description belongs to a *kind* of node — it is written once, on the
@@ -12,16 +14,18 @@ import 'package:flutter/material.dart';
 /// Markdown, most likely — renders them; see `NodeEditor.descriptionBuilder`
 /// for why the package does not decide that. Null falls back to selectable
 /// plain text, which is what a description written as prose wants anyway.
+///
+/// [title] defaults to [NodeEditorLocalizations.aboutThisNode].
 Future<void> showNodeDescription(
   BuildContext context, {
   required String description,
-  String title = 'About this node',
+  String? title,
   Widget Function(BuildContext context, String description)? builder,
 }) {
   return showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text(title),
+      title: Text(title ?? NodeEditorLocalizations.of(context).aboutThisNode),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
@@ -36,7 +40,7 @@ Future<void> showNodeDescription(
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(NodeEditorLocalizations.of(context).close),
         ),
       ],
     ),

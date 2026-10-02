@@ -64,7 +64,7 @@ class NodeGraphCodec {
   /// The version [encode] writes, and the version [decode] migrates up to.
   static const int version = 1;
 
-  static const String _packageStamp = 'fl_nodes_v2/1.0.0';
+  static const String _packageStamp = 'fl_nodes_v2/1.1.0';
 
   final PayloadCodecs? _payloads;
 

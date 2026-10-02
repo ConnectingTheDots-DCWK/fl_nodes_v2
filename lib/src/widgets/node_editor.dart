@@ -25,6 +25,7 @@ import '../painting/grid_painter.dart';
 import '../painting/grid_shader.dart';
 import '../painting/overlay_painter.dart';
 import '../painting/ports_painter.dart';
+import '../l10n/node_editor_localizations.dart';
 import '../menus/node_editor_menu_host.dart';
 import '../menus/node_editor_menus.dart';
 import '../minimap/minimap_config.dart';
@@ -1502,6 +1503,7 @@ class NodeEditorState extends State<NodeEditor>
     newProject: _newProject,
     openProject: _openProject,
     saveProject: _saveProject,
+    localizations: NodeEditorLocalizations.of(context),
   );
 
   void _describeNode(GraphNode node, String description) {
@@ -1535,21 +1537,20 @@ class NodeEditorState extends State<NodeEditor>
     // Discarding unsaved work silently, from a menu one keystroke away from
     // "Save", is the one action here that cannot be undone.
     if (_controller.project.isDirty) {
+      final words = NodeEditorLocalizations.of(context);
       final discard = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Discard unsaved changes?'),
-          content: const Text(
-            'This document has changes that have not been saved.',
-          ),
+          title: Text(words.discardChangesTitle),
+          content: Text(words.discardChangesMessage),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(words.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Discard'),
+              child: Text(words.discardConfirm),
             ),
           ],
         ),

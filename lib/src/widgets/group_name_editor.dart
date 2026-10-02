@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/node_editor_localizations.dart';
 import '../model/node_group.dart';
 
 /// The default editor for a group's name: a small modal with a text field.
@@ -10,10 +11,12 @@ import '../model/node_group.dart';
 ///
 /// Returns the new name, or null if the user backed out. An empty result
 /// restores [NodeGroup.defaultName].
+///
+/// [title] defaults to [NodeEditorLocalizations.groupNameTitle].
 Future<String?> showGroupNameEditor(
   BuildContext context, {
   required String initialValue,
-  String title = 'Group name',
+  String? title,
 }) {
   return showDialog<String>(
     context: context,
@@ -26,7 +29,7 @@ class _GroupNameDialog extends StatefulWidget {
   const _GroupNameDialog({required this.initialValue, required this.title});
 
   final String initialValue;
-  final String title;
+  final String? title;
 
   @override
   State<_GroupNameDialog> createState() => _GroupNameDialogState();
@@ -50,16 +53,19 @@ class _GroupNameDialogState extends State<_GroupNameDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final words = NodeEditorLocalizations.of(context);
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(widget.title ?? words.groupNameTitle),
       content: SizedBox(
         width: 320,
         child: TextField(
           controller: _controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Leave empty for "${NodeGroup.defaultName}"',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            // The default name is data, written into the document, and is
+            // quoted as it will be stored rather than translated.
+            hintText: words.groupNameHint(NodeGroup.defaultName),
           ),
           onSubmitted: (_) => _submit(),
         ),
@@ -67,9 +73,9 @@ class _GroupNameDialogState extends State<_GroupNameDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(words.cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Rename')),
+        FilledButton(onPressed: _submit, child: Text(words.renameConfirm)),
       ],
     );
   }

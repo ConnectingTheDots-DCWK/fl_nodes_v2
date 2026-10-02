@@ -129,7 +129,9 @@ export 'src/menus/node_editor_menus.dart'
         NodeMenuPortTarget,
         NodeMenuRequest,
         NodeMenuTarget;
-export 'src/menus/node_menu_entry.dart' show NodeMenuEntry;
+export 'src/l10n/node_editor_localizations.dart'
+    show DefaultNodeEditorLocalizations, NodeEditorLocalizations;
+export 'src/menus/node_menu_entry.dart' show NodeMenuEntry, NodeMenuEntryId;
 export 'src/minimap/minimap_config.dart' show MinimapConfig, MinimapNodeColor;
 export 'src/minimap/minimap_controller.dart' show MinimapController;
 export 'src/minimap/minimap_painter.dart' show MinimapPainter;

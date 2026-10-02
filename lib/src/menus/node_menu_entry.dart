@@ -1,5 +1,52 @@
 import 'package:flutter/material.dart';
 
+/// Which built-in entry a [NodeMenuEntry] is.
+///
+/// A menu builder that keeps, drops or relabels one of the editor's own
+/// entries matches on this, never on [NodeMenuEntry.label]: the label is in
+/// whatever language the host speaks, and a match on `'Disband'` stops
+/// matching the day the host translates it. Entries a host adds carry no id,
+/// and neither do the Create submenu's, which are the host's definitions.
+enum NodeMenuEntryId {
+  cut,
+  copy,
+  paste,
+
+  /// Deletes the selection — on a node's menu.
+  delete,
+
+  /// Deletes one wire — on a wire's menu.
+  deleteLink,
+  deleteWithContents,
+  description,
+
+  /// "Group" or "Add to group", depending on the selection.
+  group,
+  disband,
+  rename,
+  colour,
+  neutralColour,
+
+  /// One of `NodeGroup.palette`, in the colour submenu.
+  colourSwatch,
+  cutLinks,
+  goToSource,
+  goToDestination,
+  removeWaypoint,
+  addWaypointHere,
+  clearWaypoints,
+  centerView,
+  resetZoom,
+  create,
+  addComment,
+  project,
+  undo,
+  redo,
+  open,
+  save,
+  newProject,
+}
+
 /// One row of a context menu.
 ///
 /// Entries are data rather than widgets so that what a menu offers — and what
@@ -15,6 +62,7 @@ class NodeMenuEntry {
     this.shortcut,
     this.onSelected,
     this.children = const <NodeMenuEntry>[],
+    this.id,
   }) : _separator = false;
 
   /// A rule between two groups of entries.
@@ -28,6 +76,7 @@ class NodeMenuEntry {
       shortcut = null,
       onSelected = null,
       children = const <NodeMenuEntry>[],
+      id = null,
       _separator = true;
 
   final String label;
@@ -45,6 +94,10 @@ class NodeMenuEntry {
   /// Non-empty turns this into a submenu, and [onSelected] is then ignored.
   final List<NodeMenuEntry> children;
 
+  /// Which built-in entry this is, or null for one a host made. Kept by
+  /// [copyWith], so a relabelled default is still recognisable.
+  final NodeMenuEntryId? id;
+
   final bool _separator;
 
   bool get isSeparator => _separator;
@@ -60,6 +113,7 @@ class NodeMenuEntry {
     MenuSerializableShortcut? shortcut,
     VoidCallback? onSelected,
     List<NodeMenuEntry>? children,
+    NodeMenuEntryId? id,
   }) => _separator
       ? this
       : NodeMenuEntry(
@@ -68,6 +122,7 @@ class NodeMenuEntry {
           shortcut: shortcut ?? this.shortcut,
           onSelected: onSelected ?? this.onSelected,
           children: children ?? this.children,
+          id: id ?? this.id,
         );
 
   /// Drops separators that would render against nothing.
