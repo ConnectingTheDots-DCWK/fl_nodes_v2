@@ -124,6 +124,31 @@ void main() {
     });
   });
 
+  test('a node reads its stored values typed', () {
+    const node = GraphNode(
+      id: 'n',
+      position: Offset.zero,
+      data: <String, Object?>{'label': 'Go', 'count': 2, 'scale': 1.5},
+      metadata: <String, Object?>{'note': 'later', 'weight': 1},
+    );
+    expect(node.field<String>('label'), 'Go');
+    expect(
+      node.field<int>('label'),
+      isNull,
+      reason: 'a stale or hand-edited file must not throw under a host',
+    );
+    expect(node.fieldOr<int>('missing', 7), 7);
+    expect(
+      node.field<double>('count'),
+      2.0,
+      reason: 'a 2.0 written by anything but the Dart VM comes back as 2',
+    );
+    expect(node.field<double>('scale'), 1.5);
+    expect(node.metadataValue<String>('note'), 'later');
+    expect(node.metadataValue<double>('weight'), 1.0);
+    expect(node.metadataValue<bool>('note'), isNull);
+  });
+
   group('NodeGeometry', () {
     test('spreads same-side ports evenly', () {
       const target = GraphNode(

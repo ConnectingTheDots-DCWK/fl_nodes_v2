@@ -77,11 +77,8 @@ class NodeResolutionContext {
 
   Map<String, Object?> get fields => node.data;
 
-  /// The value at [key] when it is a [T], else null.
-  T? field<T>(String key) {
-    final value = node.data[key];
-    return value is T ? value : null;
-  }
+  /// The value at [key] when it is a [T], else null. See [GraphNode.field].
+  T? field<T>(String key) => node.field<T>(key);
 
   T fieldOr<T>(String key, T fallback) => field<T>(key) ?? fallback;
 

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'node_port.dart';
 import 'payload_equality.dart';
+import 'typed_value.dart';
 
 /// A single box on the canvas.
 ///
@@ -120,6 +121,22 @@ class GraphNode {
       selectable: selectable ?? this.selectable,
     );
   }
+
+  /// The [data] value at [key] as a [T], or null when there is none or it is
+  /// something else.
+  ///
+  /// A wrong type reads as missing rather than throwing, because [data] comes
+  /// back from a file. An `int` is accepted as a `double`: `1.0` comes back as
+  /// `1` from anything that is not the Dart VM. The same rule as the
+  /// `field` a definition's resolver and executor read through.
+  T? field<T>(String key) => typedValue<T>(data[key]);
+
+  /// [field], or [fallback] when that is null.
+  T fieldOr<T>(String key, T fallback) => field<T>(key) ?? fallback;
+
+  /// The [metadata] value at [key] as a [T], read by the rule [field] reads
+  /// [data] by.
+  T? metadataValue<T>(String key) => typedValue<T>(metadata[key]);
 
   /// Returns a copy with [entries] merged into [data].
   GraphNode withData(Map<String, Object?> entries) =>
