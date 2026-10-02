@@ -462,6 +462,16 @@ replaces, deliberately and visibly. Direction, presence and self-connection
 are never the validator's: `_normalize` refuses those first, because a pair
 that is not one output and one input is not a question about the domain.
 
+**A pasted wire is asked what a drawn one is.** A fragment can come from
+clipboard text — another document, another build, a hand edit — and `paste`
+used to put its wires in directly. Now `_admitted` judges them against the
+graph *after* resolution, because under `PortStorage.foreign` the text holds
+no family ports and a variadic family derives its exits from the very wires
+being judged; then admits them one at a time, so two that each fit a port
+alone cannot fill it past its limit together. A refused wire stays behind and
+its nodes still arrive. `_mutate` resolves again afterwards, which is a second
+pass on paste and nowhere else.
+
 **Neither hook sees undo or redo.** `history.undo()` sets `_graph` directly and
 calls `_afterJump`; it does not go through `_mutate`. That is correct rather
 than an oversight: undo restores a graph the hooks already saw, and a host that

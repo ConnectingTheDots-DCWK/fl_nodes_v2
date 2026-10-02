@@ -7,6 +7,8 @@ import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 // `NodeEditor.minimap`, and only these tests need the type itself.
 import 'package:fl_nodes_v2/src/minimap/minimap_palette.dart';
 import 'package:fl_nodes_v2/src/minimap/minimap_panel.dart';
+import 'package:fl_nodes_v2/src/minimap/minimap_projection.dart'
+    show minimapNodeColor, minimapShadeBands;
 
 void main() {
   // --------------------------------------------------------------- factories

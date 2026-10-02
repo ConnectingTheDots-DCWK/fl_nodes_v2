@@ -118,13 +118,12 @@ class NodeEditorController extends ChangeNotifier {
     NodeGraph? graph,
     ViewportTransform viewport = ViewportTransform.identity,
     int historyLimit = 50,
-    ConnectionValidator? connectionValidator,
+    this.connectionValidator,
     NodeDefinitionRegistry? definitions,
     NodeGraphCodec? codec,
     this.allowSelfConnections = false,
     double spatialCellSize = 512,
   }) : _graph = graph ?? NodeGraph.empty,
-       _validator = connectionValidator,
        _definitions = definitions ?? NodeDefinitionRegistry.empty {
     history = NodeEditorHistory(this, limit: historyLimit);
     selection = NodeEditorSelection(this);
@@ -174,8 +173,6 @@ class NodeEditorController extends ChangeNotifier {
   /// Whether a node may be wired back to itself.
   final bool allowSelfConnections;
 
-  final ConnectionValidator? _validator;
-
   NodeDefinitionRegistry _definitions;
 
   NodeGraph _graph;
@@ -206,6 +203,13 @@ class NodeEditorController extends ChangeNotifier {
 
   /// Told after every edit that landed, with what it touched.
   GraphEditListener? onEdit;
+
+  /// Whether a pair of ports may be wired; null leaves it to
+  /// [ConnectionCheck.allowedByDefault]. Asked by [canConnect], [connect], a
+  /// drag looking for a target and every wire a paste brings in. Settable like
+  /// [guard], so a host whose rules change with a mode swaps it rather than
+  /// building another controller; wires already drawn are not re-asked.
+  ConnectionValidator? connectionValidator;
 
   /// Bumped whenever node geometry or the graph itself changes.
   ///
@@ -901,10 +905,13 @@ class NodeEditorController extends ChangeNotifier {
     return _graph.connections.containsKey(connection.id) ? connection.id : null;
   }
 
-  /// Orders a candidate pair as (output, input) and validates it.
-  (PortRef, PortRef)? _normalize(PortRef a, PortRef b) {
-    final portA = _portOf(a);
-    final portB = _portOf(b);
+  /// Orders a candidate pair as (output, input) and validates it against
+  /// [graph], the current one unless a paste is judging the graph it is about
+  /// to make.
+  (PortRef, PortRef)? _normalize(PortRef a, PortRef b, {NodeGraph? graph}) {
+    final subject = graph ?? _graph;
+    final portA = subject.nodes[a.nodeId]?.portById(a.portId);
+    final portB = subject.nodes[b.nodeId]?.portById(b.portId);
     if (portA == null || portB == null) return null;
     if (portA.direction == portB.direction) return null;
 
@@ -912,13 +919,13 @@ class NodeEditorController extends ChangeNotifier {
     if (!allowSelfConnections && from.nodeId == to.nodeId) return null;
 
     final check = ConnectionCheck._(
-      _graph,
+      subject,
       from,
       to,
       portA.isOutput ? portA : portB,
       portA.isOutput ? portB : portA,
     );
-    final validator = _validator;
+    final validator = connectionValidator;
     final allowed = validator == null
         ? check.allowedByDefault
         : validator(check);

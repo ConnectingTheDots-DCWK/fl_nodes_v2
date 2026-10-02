@@ -228,6 +228,52 @@ void main() {
       );
     });
 
+    test('a pasted wire is asked what a drawn one is', () {
+      final controller = controllerWith(
+        <GraphNode>[node('a'), node('b'), node('c')],
+        connections: const <NodeConnection>[
+          NodeConnection(
+            id: 'ac',
+            from: PortRef('a', 'out'),
+            to: PortRef('c', 'in'),
+          ),
+          NodeConnection(
+            id: 'bc',
+            from: PortRef('b', 'out'),
+            to: PortRef('c', 'in'),
+          ),
+        ],
+      );
+      controller.selection.selectNodes(<String>['a', 'b', 'c']);
+      controller.clipboard.copy();
+
+      // One wire per input. Set after the copy, because the rule is the
+      // controller's at the moment of pasting, not the fragment's.
+      controller.connectionValidator = (check) =>
+          check.allowedByDefault && check.graph.connectionsAt(check.to).isEmpty;
+      final pasted = controller.clipboard.paste();
+      expect(pasted, hasLength(3), reason: 'a refused wire keeps its nodes');
+      final into = controller.graph.connections.values.where(
+        (wire) => pasted.contains(wire.to.nodeId),
+      );
+      expect(
+        into,
+        hasLength(1),
+        reason:
+            'admitted one at a time: judged together, each would see the '
+            'other and both would go; judged alone, both would fit',
+      );
+
+      controller.connectionValidator = null;
+      final again = controller.clipboard.paste();
+      expect(
+        controller.graph.connections.values.where(
+          (wire) => again.contains(wire.to.nodeId),
+        ),
+        hasLength(2),
+      );
+    });
+
     test('undo removes exactly what was pasted', () {
       final controller = controllerWith(
         <GraphNode>[node('a'), node('b', position: const Offset(200, 0))],

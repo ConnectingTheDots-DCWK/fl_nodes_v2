@@ -244,7 +244,9 @@ NodeEditorController(
 
 `allowedByDefault` is the package's own verdict on duplicates, capacity and
 `portsCompatible`. A validator that does not read it replaces those checks,
-which is occasionally what you want and is now something you can see.
+which is occasionally what you want and is now something you can see. It is a
+settable field, and a pasted wire is asked the same question as a drawn one —
+one that is refused stays behind, and its nodes still arrive.
 
 **Kinds and types.** A port is `PortKind.data` or `PortKind.control`. Data
 carries a value; control carries the flow of execution. They never join.
