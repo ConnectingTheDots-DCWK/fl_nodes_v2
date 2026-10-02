@@ -3,7 +3,74 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
-## Unreleased
+## 1.0.0
+
+The API is stable from here. **A document saved by 0.5.0 reads unchanged**:
+the envelope is still version 1 and every key is the same, because the names
+that changed are Dart's, and the ones that are also the file's — a node's
+`type`, a port's `kind` and `dataType` — were kept for exactly that reason.
+
+### Renamed
+
+- **A prototype is a definition.** `NodePrototype` was never a template
+  stamped out once; it is a rule a node is resolved against for as long as it
+  exists, which its own documentation said. Everything named after it follows.
+
+| 0.5.0 | 1.0.0 |
+| --- | --- |
+| `NodePrototype` | `NodeDefinition` |
+| `LinkPrototype` | `LinkDefinition` |
+| `NodePrototypeRegistry` | `NodeDefinitionRegistry` |
+| `PrototypeResolution` | `DefinitionResolution` |
+| `PrototypeDivergenceHandler` | `DefinitionDivergenceHandler` |
+| `registry.linkPrototype(type)` | `registry.linkDefinition(type)` |
+| `NodeEditorController(prototypes:)`, `controller.prototypes` | `definitions:`, `controller.definitions` |
+| `NodeGraphCodec(prototypes:)`, `ConnectionsPainter.prototypes` | `definitions` |
+| `(graph, from, to) => …` as a `ConnectionValidator` | `(check) => check.allowedByDefault && …` |
+| `NodeEditorController.defaultConnectionValidator` | `ConnectionCheck.allowedByDefault` |
+
+### Wiring
+
+- **BREAKING: a connection validator is handed the default rather than
+  replaced by it.** `ConnectionValidator` takes a `ConnectionCheck` — both
+  `PortRef`s, both `NodePort`s, the graph, and `allowedByDefault`, the
+  package's own verdict on duplicates, `maxConnections` and `portsCompatible`,
+  worked out only if read. Anding it in adds a rule; not reading it replaces
+  the checks, which used to happen to every validator whether or not its
+  author meant it. *a validator adds to the default checks, or replaces them*
+  in `test/controller_test.dart`.
+- **`connectionValidator` is a settable field** (`null`), beside `guard` and
+  `onEdit`, so a host whose rules change with a mode swaps it.
+- **A pasted wire answers to the same rules as a drawn one.** A fragment can
+  come from clipboard text, so its wires are judged against the graph after
+  resolution and admitted one at a time; a refused one stays behind and its
+  nodes still arrive. *a pasted wire is asked what a drawn one is* in
+  `test/clipboard_test.dart`.
+
+### Reading a node
+
+- **`GraphNode.field<T>`, `fieldOr<T>` and `metadataValue<T>`** read `data`
+  and `metadata` typed: null when a key is absent or holds something else,
+  rather than a throw under a host reading a file somebody edited, and an
+  `int` accepted as a `double` because `1.0` comes back as `1` from anything
+  that is not the Dart VM. The resolution and execution contexts' `field` now
+  follow the same rule. *a node reads its stored values typed* in
+  `test/model_test.dart`.
+
+### Removed from the barrel
+
+- `arrowheadSize`, `arrowheadsPath`, `minimapShadeBands` and
+  `minimapNodeColor`: helpers the package's painters share. The painters,
+  `ConnectionLayout`, `ConnectionRouter`, `SpatialHashGrid` and
+  `MinimapProjection` stay public — the README's Layers table is a promise
+  that each layer is usable on its own.
+
+### Documentation
+
+- The README follows the order a new editor meets things — the model, the
+  controller, bodies, ports, node types, wiring — then customisation, and
+  keeps dynamic ports, execution and serialisation for an *Advanced* part.
+
 
 ### The canvas
 
@@ -41,14 +108,14 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
 ### A card can explain itself
 
 - **`NodePort.description` and `NodeField.description`** say what one wire
-  carries and what one control on the card does, beside the prototype's own
+  carries and what one control on the card does, beside the definition's own
   `description`. A host with a documentation page no longer keeps that prose
   in two places.
   A port's is **outside `==`, `hashCode` and the codec**, on purpose: a port is
   serialised and resolution keeps the node it has when the ports it would build
   compare equal, so comparing prose would rewrite every node in every document
   written before the prose existed. A field's is neither serialised nor
-  compared-away, because a field declaration never leaves the prototype.
+  compared-away, because a field declaration never leaves the definition.
 - **`NodeEditor.descriptionBuilder`** renders the "About this node" dialog's
   body. The default is still selectable plain text; a host whose descriptions
   are Markdown passes its own body, with its own styles and link handling. The
