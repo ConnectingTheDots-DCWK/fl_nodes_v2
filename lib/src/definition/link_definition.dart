@@ -31,7 +31,7 @@ class LinkResolutionContext {
 /// Who decides a link's caption.
 ///
 /// The two cases are deliberately exclusive: a caption is either derived by
-/// the prototype or owned by the app user, and there is no configuration in
+/// the definition or owned by the app user, and there is no configuration in
 /// which both are true. Mixing them would raise a question with no good answer
 /// — whether re-deriving should overwrite what somebody typed.
 @immutable
@@ -39,7 +39,7 @@ sealed class LinkLabel {
   const LinkLabel();
 }
 
-/// A caption the prototype computes, and the app user cannot change.
+/// A caption the definition computes, and the app user cannot change.
 ///
 /// It follows whatever it is derived from with no bookkeeping, because it is
 /// never stored: [NodeConnection.label] is ignored for links that use this.
@@ -64,10 +64,10 @@ final class EditableLinkLabel extends LinkLabel {
 ///
 /// Links are far simpler than nodes: they have no ports to derive and no
 /// geometry of their own, and they take no part in node resolution. What a
-/// prototype decides is where a link's caption comes from.
+/// definition decides is where a link's caption comes from.
 @immutable
-class LinkPrototype {
-  const LinkPrototype({required this.type, this.label});
+class LinkDefinition {
+  const LinkDefinition({required this.type, this.label});
 
   /// Matched against [NodeConnection.type].
   final String type;
@@ -82,11 +82,11 @@ class LinkPrototype {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LinkPrototype && other.type == type && other.label == label;
+      other is LinkDefinition && other.type == type && other.label == label;
 
   @override
   int get hashCode => Object.hash(type, label);
 
   @override
-  String toString() => 'LinkPrototype($type)';
+  String toString() => 'LinkDefinition($type)';
 }

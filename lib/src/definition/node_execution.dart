@@ -48,7 +48,7 @@ typedef NodeExecutor = Future<void> Function(NodeExecutionContext context);
 ///
 /// Implemented by the runner and deliberately not exported: it exists so
 /// [NodeExecutionContext] can be a thin, typed façade over state that lives in
-/// the run, rather than the run's state leaking into the prototype layer.
+/// the run, rather than the run's state leaking into the definition layer.
 abstract class NodeExecutionStep {
   NodeGraph get graph;
   GraphNode get node;
@@ -76,7 +76,7 @@ abstract class NodeExecutionStep {
 /// Everything a [NodeExecutor] is given, and everything it can do.
 ///
 /// One object rather than a handful of positional maps and callbacks, matching
-/// the other prototype hooks. It reaches the graph and the node but never the
+/// the other definition hooks. It reaches the graph and the node but never the
 /// controller: writing to the document from inside a run is not something to
 /// stumble into, and execution is supposed to leave the document alone.
 class NodeExecutionContext {

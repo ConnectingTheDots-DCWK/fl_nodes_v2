@@ -91,7 +91,7 @@ class NodeEditorClipboard {
 
   /// Pastes the buffer and selects the result.
   ///
-  /// Returns the ids of the nodes that actually landed. A prototype resolves
+  /// Returns the ids of the nodes that actually landed. A definition resolves
   /// the pasted nodes on the way in and is free to prune one, so this is the
   /// honest answer rather than the ids that were attempted.
   ///
@@ -236,7 +236,7 @@ class NodeEditorClipboard {
 
     final pasted = ids.values.toList(growable: false);
     // One mutation, so one undo step — and one resolution pass, which is what
-    // gives a pasted node its prototype-owned ports back. A family derived
+    // gives a pasted node its definition-owned ports back. A family derived
     // from link state resolves against the wires that came along, so a node
     // copied without them legitimately arrives smaller than it left.
     _controller._mutate(

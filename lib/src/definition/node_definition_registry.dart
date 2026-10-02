@@ -8,17 +8,17 @@ import '../model/node_connection.dart';
 import '../model/node_graph.dart';
 import '../model/node_port.dart';
 import '../model/port_ref.dart';
-import 'link_prototype.dart';
-import 'node_prototype.dart';
+import 'link_definition.dart';
+import 'node_definition.dart';
 import 'node_resolution.dart';
 
-/// Reports a node whose prototype never settled.
-typedef PrototypeDivergenceHandler = void Function(GraphNode node, int passes);
+/// Reports a node whose definition never settled.
+typedef DefinitionDivergenceHandler = void Function(GraphNode node, int passes);
 
 /// What came of a resolution.
 @immutable
-class PrototypeResolution {
-  const PrototypeResolution({
+class DefinitionResolution {
+  const DefinitionResolution({
     required this.graph,
     required this.changed,
     required this.pruned,
@@ -42,7 +42,7 @@ class PrototypeResolution {
 
   @override
   String toString() =>
-      'PrototypeResolution(${changed.length} changed, ${pruned.length} pruned, '
+      'DefinitionResolution(${changed.length} changed, ${pruned.length} pruned, '
       '${diverged.length} diverged)';
 }
 
@@ -67,45 +67,45 @@ class NodeFieldGroup {
   String toString() => 'NodeFieldGroup($family, ${keys.length} keys)';
 }
 
-/// The prototypes a document is normalised against.
+/// The definitions a document is normalised against.
 ///
 /// Resolution is a pure function over a [NodeGraph] and lives here rather than
 /// on the controller, so graph logic stays testable without pumping a widget.
 /// The controller only decides *when* to call it.
-class NodePrototypeRegistry {
-  NodePrototypeRegistry(
-    Iterable<NodePrototype> prototypes, {
-    Iterable<LinkPrototype> links = const <LinkPrototype>[],
+class NodeDefinitionRegistry {
+  NodeDefinitionRegistry(
+    Iterable<NodeDefinition> definitions, {
+    Iterable<LinkDefinition> links = const <LinkDefinition>[],
     this.onDiverged,
     this.maxSteps = 64,
-  }) : _byType = <String, NodePrototype>{
-         for (final prototype in prototypes) prototype.type: prototype,
+  }) : _byType = <String, NodeDefinition>{
+         for (final definition in definitions) definition.type: definition,
        },
-       _linksByType = <String, LinkPrototype>{
+       _linksByType = <String, LinkDefinition>{
          for (final link in links) link.type: link,
        };
 
   /// A registry that normalises nothing.
-  static final NodePrototypeRegistry empty = NodePrototypeRegistry(
-    const <NodePrototype>[],
+  static final NodeDefinitionRegistry empty = NodeDefinitionRegistry(
+    const <NodeDefinition>[],
   );
 
-  final Map<String, NodePrototype> _byType;
-  final Map<String, LinkPrototype> _linksByType;
+  final Map<String, NodeDefinition> _byType;
+  final Map<String, LinkDefinition> _linksByType;
 
   /// Called for a node that never settled.
   ///
   /// Defaults to a console error in debug builds. A divergent builder is a bug
   /// in the host, not in the document, and throwing would take the app down
   /// mid hot-reload — which is exactly when a half-written builder is normal.
-  final PrototypeDivergenceHandler? onDiverged;
+  final DefinitionDivergenceHandler? onDiverged;
 
   /// Cascade steps allowed on top of the seeds, per [resolve] call.
   final int maxSteps;
 
   /// Whether there is anything to normalise.
   ///
-  /// Link prototypes do not take part in resolution — they describe what the
+  /// Link definitions do not take part in resolution — they describe what the
   /// app user may do with a connection, not what shape it takes — so they do
   /// not count here.
   bool get isEmpty => _byType.isEmpty;
@@ -113,10 +113,10 @@ class NodePrototypeRegistry {
 
   Iterable<String> get types => _byType.keys;
 
-  NodePrototype? operator [](String type) => _byType[type];
+  NodeDefinition? operator [](String type) => _byType[type];
 
-  /// The prototype for connections of [type], if one is registered.
-  LinkPrototype? linkPrototype(String type) => _linksByType[type];
+  /// The definition for connections of [type], if one is registered.
+  LinkDefinition? linkDefinition(String type) => _linksByType[type];
 
   /// Whether the app user may retitle [connection] by tapping its caption.
   ///
@@ -146,7 +146,7 @@ class NodePrototypeRegistry {
     return label is EditableLinkLabel ? label.editorTitle : 'Link label';
   }
 
-  /// Whether [node] is normalised by a prototype at all.
+  /// Whether [node] is normalised by a definition at all.
   bool handles(GraphNode node) => _byType.containsKey(node.type);
 
   /// The fields [node] declares right now.
@@ -155,25 +155,25 @@ class NodePrototypeRegistry {
   /// the node's current values, so a body rendering these rows grows and
   /// shrinks with them instead of hard-coding a list.
   List<NodeField> fieldsOf(NodeGraph graph, GraphNode node) {
-    final prototype = _byType[node.type];
-    if (prototype == null) return const <NodeField>[];
-    return _declare(_contextFor(graph, node, 0), prototype).fields;
+    final definition = _byType[node.type];
+    if (definition == null) return const <NodeField>[];
+    return _declare(_contextFor(graph, node, 0), definition).fields;
   }
 
   /// The field families [node] declares right now, in declaration order.
   ///
   /// [fieldsOf] flattens the same information. This keeps the family each key
   /// belongs to, which is what a document records so a reader can tell a value
-  /// the prototype manages from one the host put there itself.
+  /// the definition manages from one the host put there itself.
   List<NodeFieldGroup> fieldGroupsOf(NodeGraph graph, GraphNode node) {
-    final prototype = _byType[node.type];
-    if (prototype == null || prototype.fields.isEmpty) {
+    final definition = _byType[node.type];
+    if (definition == null || definition.fields.isEmpty) {
       return const <NodeFieldGroup>[];
     }
 
     final context = _contextFor(graph, node, 0);
     final groups = <NodeFieldGroup>[];
-    for (final family in prototype.fields) {
+    for (final family in definition.fields) {
       final fields = switch (family) {
         StaticFieldFamily(fields: final declared) => declared,
         DynamicFieldFamily(:final build) => build(context.forFamily(family.id)),
@@ -201,20 +201,20 @@ class NodePrototypeRegistry {
     double? width,
     Map<String, Object?> data = const <String, Object?>{},
   }) {
-    final prototype = _byType[type];
+    final definition = _byType[type];
     final seed = GraphNode(
       id: id,
       type: type,
       position: position,
-      width: width ?? prototype?.defaultWidth ?? GraphNode.defaultWidth,
+      width: width ?? definition?.defaultWidth ?? GraphNode.defaultWidth,
       data: data,
     );
-    if (prototype == null) return seed;
-    return _settle(NodeGraph(nodes: <GraphNode>[seed]), seed, prototype).node;
+    if (definition == null) return seed;
+    return _settle(NodeGraph(nodes: <GraphNode>[seed]), seed, definition).node;
   }
 
   /// Normalises every node in [graph].
-  PrototypeResolution resolveAll(NodeGraph graph) =>
+  DefinitionResolution resolveAll(NodeGraph graph) =>
       resolve(graph, seeds: graph.nodes.keys.toList(growable: false));
 
   /// Normalises [seeds] and anything a cascade reaches.
@@ -223,7 +223,7 @@ class NodePrototypeRegistry {
   /// changes the *other* endpoint's link state — which is an input to its own
   /// resolution. So this is a worklist over the graph, not a rewrite of one
   /// node in isolation.
-  PrototypeResolution resolve(
+  DefinitionResolution resolve(
     NodeGraph graph, {
     required Iterable<String> seeds,
   }) {
@@ -231,7 +231,7 @@ class NodePrototypeRegistry {
     final pruned = <String>{};
     final diverged = <String>{};
     if (_byType.isEmpty) {
-      return PrototypeResolution(
+      return DefinitionResolution(
         graph: graph,
         changed: changed,
         pruned: pruned,
@@ -259,13 +259,13 @@ class NodePrototypeRegistry {
 
       final node = out.node(id);
       if (node == null) continue;
-      final prototype = _byType[node.type];
-      if (prototype == null) continue;
+      final definition = _byType[node.type];
+      if (definition == null) continue;
 
-      final settled = _settle(out, node, prototype);
+      final settled = _settle(out, node, definition);
       if (settled.diverged) {
         diverged.add(id);
-        _reportDivergence(node, prototype);
+        _reportDivergence(node, definition);
       }
 
       final before = out;
@@ -289,7 +289,7 @@ class NodePrototypeRegistry {
           ];
           if (affected.isNotEmpty) {
             handled = true;
-            out = prototype.onPortsRemoved(
+            out = definition.onPortsRemoved(
               PortRemoval(
                 graph: out,
                 node: settled.node,
@@ -302,7 +302,7 @@ class NodePrototypeRegistry {
       }
 
       // Swept for every node that settled, not only for one that lost a port.
-      // A document can arrive referencing a port its prototype never creates —
+      // A document can arrive referencing a port its definition never creates —
       // a saved wire on an exit that was not stored, say — and a connection
       // pointing at a port that is not there draws nothing while staying in the
       // model. An invisible edge that survives undo and gets written out again
@@ -330,7 +330,7 @@ class NodePrototypeRegistry {
       enqueue(id);
     }
 
-    return PrototypeResolution(
+    return DefinitionResolution(
       graph: out,
       changed: changed,
       pruned: pruned,
@@ -341,13 +341,13 @@ class NodePrototypeRegistry {
   // --- node-local resolution ------------------------------------------------
 
   /// Runs passes until the node stops changing.
-  _Settled _settle(NodeGraph graph, GraphNode node, NodePrototype prototype) {
+  _Settled _settle(NodeGraph graph, GraphNode node, NodeDefinition definition) {
     var current = node;
-    var next = _pass(graph, current, prototype, 0);
+    var next = _pass(graph, current, definition, 0);
     var pass = 1;
-    while (next != current && pass < prototype.maxPasses) {
+    while (next != current && pass < definition.maxPasses) {
       current = next;
-      next = _pass(graph, current, prototype, pass);
+      next = _pass(graph, current, definition, pass);
       pass++;
     }
     return _Settled(next, next != current);
@@ -361,13 +361,13 @@ class NodePrototypeRegistry {
   GraphNode _pass(
     NodeGraph graph,
     GraphNode node,
-    NodePrototype prototype,
+    NodeDefinition definition,
     int pass,
   ) {
     final context = _contextFor(graph, node, pass);
-    final declared = _declare(context, prototype);
+    final declared = _declare(context, definition);
 
-    final data = prototype.inheritFields(
+    final data = definition.inheritFields(
       NodeFieldMergeContext(
         node: node,
         declared: declared.fields,
@@ -382,7 +382,7 @@ class NodePrototypeRegistry {
 
     final ports = <NodePort>[];
     final generated = <String>{};
-    for (final family in prototype.ports) {
+    for (final family in definition.ports) {
       final built = switch (family) {
         StaticPortFamily(ports: final declaredPorts) => declaredPorts,
         DynamicPortFamily(build: final build) => build(
@@ -397,7 +397,7 @@ class NodePrototypeRegistry {
         );
         assert(
           !generated.contains(port.id),
-          'prototype "${prototype.type}" produced two ports with id '
+          'definition "${definition.type}" produced two ports with id '
           '"${port.id}" on node "${node.id}"',
         );
         generated.add(port.id);
@@ -408,8 +408,8 @@ class NodePrototypeRegistry {
     }
 
     // Ports no family owns keep their place after the generated ones — unless
-    // the prototype declares the same id, in which case the generated port
-    // adopts it. That is what lets a prototype be pointed at a document whose
+    // the definition declares the same id, in which case the generated port
+    // adopts it. That is what lets a definition be pointed at a document whose
     // ports were authored by hand: it takes them over rather than doubling
     // them up, which would break every lookup that goes through portById.
     for (final port in seededContext.foreignPorts) {
@@ -421,7 +421,7 @@ class NodePrototypeRegistry {
         ? seeded
         : seeded.copyWith(ports: ports);
 
-    final resolveHeight = prototype.resolveHeight;
+    final resolveHeight = definition.resolveHeight;
     if (resolveHeight != null) {
       final height = resolveHeight(seededContext.forNode(next).forFamily(null));
       if (height != next.height) next = next.withHeight(height);
@@ -429,11 +429,11 @@ class NodePrototypeRegistry {
     return next;
   }
 
-  _Declared _declare(NodeResolutionContext context, NodePrototype prototype) {
-    if (prototype.fields.isEmpty) return const _Declared._empty();
+  _Declared _declare(NodeResolutionContext context, NodeDefinition definition) {
+    if (definition.fields.isEmpty) return const _Declared._empty();
     final fields = <NodeField>[];
     final prefixes = <String>{};
-    for (final family in prototype.fields) {
+    for (final family in definition.fields) {
       switch (family) {
         case StaticFieldFamily(fields: final declared):
           fields.addAll(declared);
@@ -486,10 +486,10 @@ class NodePrototypeRegistry {
     return doomed.isEmpty ? graph : graph.removeConnections(doomed);
   }
 
-  void _reportDivergence(GraphNode node, NodePrototype prototype) {
+  void _reportDivergence(GraphNode node, NodeDefinition definition) {
     final handler = onDiverged;
     if (handler != null) {
-      handler(node, prototype.maxPasses);
+      handler(node, definition.maxPasses);
       return;
     }
     assert(() {
@@ -497,7 +497,7 @@ class NodePrototypeRegistry {
         FlutterErrorDetails(
           exception: StateError(
             'Node "${node.id}" of type "${node.type}" did not settle in '
-            '${prototype.maxPasses} passes, so its shape may be stale.\n'
+            '${definition.maxPasses} passes, so its shape may be stale.\n'
             'A family builder has to return an equal result when called twice '
             'on the same state. The usual causes are generating port ids from '
             'a counter instead of from the state, and putting a freshly '
@@ -505,7 +505,7 @@ class NodePrototypeRegistry {
             'both read as a change on every pass.',
           ),
           library: 'fl_nodes_v2',
-          context: ErrorDescription('resolving a node against its prototype'),
+          context: ErrorDescription('resolving a node against its definition'),
         ),
       );
       return true;

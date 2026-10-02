@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
 import 'inspector_panel.dart';
-import 'prototype_nodes.dart';
+import 'definition_nodes.dart';
 import 'sample_graph.dart';
 import 'workflow_node.dart';
 import 'workflow_node_card.dart';
@@ -96,7 +96,7 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
       graph: buildSampleGraph(),
       // The format and fan-out nodes arrive holding only their fields; their
       // ports are derived from those, here and on every later edit.
-      prototypes: workflowPrototypes,
+      definitions: workflowDefinitions,
       // The same codec the Document menu saves with. Handing it over is what
       // puts a copied selection on the system clipboard, so it can be pasted
       // into a second window of this app.
@@ -190,7 +190,7 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
   /// Places a new node at the centre of the current view.
   ///
   /// The switch over node types that used to live here is gone: every type is
-  /// a registered prototype now, so the registry knows how to build one and
+  /// a registered definition now, so the registry knows how to build one and
   /// the editor's own "Create" menu builds the same node this does.
   void _addNode(String type, {Offset? scenePosition}) {
     final size = _editorKey.currentState?.viewportSize ?? const Size(800, 600);
@@ -203,7 +203,7 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
 
     final id = _controller.nextId(type);
     _controller.addNode(
-      _controller.prototypes.instantiate(type, id: id, position: position),
+      _controller.definitions.instantiate(type, id: id, position: position),
     );
     _controller.selection.selectNode(id);
   }
@@ -224,12 +224,12 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
     _fit();
   }
 
-  /// The document codec, told which prototypes are in play.
+  /// The document codec, told which definitions are in play.
   ///
   /// It uses them only to decide what it may leave *out* — a caption the
   /// fan-out recomputes, for one. Reading never needs them.
   static final NodeGraphCodec _codec = NodeGraphCodec(
-    prototypes: workflowPrototypes,
+    definitions: workflowDefinitions,
   );
 
   void _report(String message) {
@@ -324,9 +324,9 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
   }
 
   /// The node types the editor will offer, in the order it offers them.
-  List<NodePrototype> get _creatable {
-    final registry = _controller.prototypes;
-    return <NodePrototype>[
+  List<NodeDefinition> get _creatable {
+    final registry = _controller.definitions;
+    return <NodeDefinition>[
       for (final type in registry.types)
         if (registry[type]?.label != null) registry[type]!,
     ]..sort((a, b) => a.label!.compareTo(b.label!));
@@ -453,11 +453,11 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
             const SizedBox(width: 16),
             MenuAnchor(
               menuChildren: <Widget>[
-                for (final prototype in _creatable)
+                for (final definition in _creatable)
                   MenuItemButton(
-                    leadingIcon: Icon(prototype.icon, size: 18),
-                    onPressed: () => _addNode(prototype.type),
-                    child: Text(prototype.label!),
+                    leadingIcon: Icon(definition.icon, size: 18),
+                    onPressed: () => _addNode(definition.type),
+                    child: Text(definition.label!),
                   ),
               ],
               builder: (context, menu, _) => FilledButton.icon(

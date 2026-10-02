@@ -178,7 +178,7 @@ abstract final class WorkflowNodes {
     );
   }
 
-  /// Fields only: `conditionPrototype` derives the ports and the height from
+  /// Fields only: `conditionDefinition` derives the ports and the height from
   /// `branches`, and having the row maths in two places is exactly how the
   /// ports and the rows they are supposed to line up with drift apart.
   static GraphNode condition({

@@ -5,7 +5,7 @@ import 'workflow_node.dart';
 
 /// The two nodes in this demo whose shape is derived rather than authored.
 ///
-/// Both are ordinary [NodePrototype]s: given what the node's fields say and how
+/// Both are ordinary [NodeDefinition]s: given what the node's fields say and how
 /// it is wired right now, they return the ports it should have. Nothing else in
 /// the demo knows they are special — the card, the inspector and the painters
 /// all see a perfectly ordinary [GraphNode].
@@ -23,7 +23,7 @@ List<int> formatSlots(String text) => <int>{
 
 /// Namespace for the per-argument literal values.
 ///
-/// The prototype manages every key beneath it, which is how a value whose slot
+/// The definition manages every key beneath it, which is how a value whose slot
 /// has gone from the format string gets cleaned up with it.
 const String argKeyPrefix = 'arg.';
 const String _exitIdPrefix = 'exit_';
@@ -35,7 +35,7 @@ String argKey(int index) => '$argKeyPrefix$index';
 ///
 /// Type `{1}` into the field and a second input appears; delete it and the port
 /// goes, taking any wire that landed on it with it, in one undo step.
-final NodePrototype formatPrototype = NodePrototype(
+final NodeDefinition formatDefinition = NodeDefinition(
   type: 'format',
   label: 'Format',
   icon: Icons.data_object_rounded,
@@ -133,7 +133,7 @@ int _exitCount(NodeResolutionContext context) =>
 ///
 /// The rule is a pure function of link state, which is what makes it settle:
 /// resolving it twice in a row produces the same ports the second time.
-final NodePrototype fanOutPrototype = NodePrototype(
+final NodeDefinition fanOutDefinition = NodeDefinition(
   type: 'fanOut',
   label: 'Fan out',
   icon: Icons.shuffle_rounded,
@@ -208,7 +208,7 @@ final NodePrototype fanOutPrototype = NodePrototype(
 /// A real host picks one. Taking all of them shows the thing worth seeing
 /// here: control flow is a pulse, so a node several branches converge on runs
 /// once for each of them.
-final NodePrototype conditionPrototype = NodePrototype(
+final NodeDefinition conditionDefinition = NodeDefinition(
   type: 'condition',
   label: 'Condition',
   icon: Icons.call_split_rounded,
@@ -279,17 +279,17 @@ List<String> conditionBranches(GraphNode node) {
   return names.isEmpty ? const <String>['Branch'] : names;
 }
 
-/// The prototypes this demo normalises its document against.
+/// The definitions this demo normalises its document against.
 /// The four nodes whose shape is authored rather than derived.
 ///
 /// They were plain [GraphNode]s until the editor grew a "Create" menu, which
-/// reads the registry: a prototype is how a node type says what it is called,
+/// reads the registry: a definition is how a node type says what it is called,
 /// what it looks like in a list, and what it is for. Declaring their ports and
 /// fields here as well is what lets the menu build one from nothing — and it
 /// costs the nodes already on the canvas nothing, because a family that
 /// declares exactly the ports a node already has adopts them rather than
 /// replacing them.
-final NodePrototype triggerPrototype = NodePrototype(
+final NodeDefinition triggerDefinition = NodeDefinition(
   type: 'trigger',
   label: 'Trigger',
   icon: Icons.bolt_rounded,
@@ -321,7 +321,7 @@ final NodePrototype triggerPrototype = NodePrototype(
   ],
 );
 
-final NodePrototype actionPrototype = NodePrototype(
+final NodeDefinition actionDefinition = NodeDefinition(
   type: 'action',
   label: 'Action',
   icon: Icons.play_arrow_rounded,
@@ -355,7 +355,7 @@ final NodePrototype actionPrototype = NodePrototype(
   ],
 );
 
-final NodePrototype outputPrototype = NodePrototype(
+final NodeDefinition outputDefinition = NodeDefinition(
   type: 'output',
   label: 'Output',
   icon: Icons.check_circle_outline_rounded,
@@ -390,7 +390,7 @@ final NodePrototype outputPrototype = NodePrototype(
   ],
 );
 
-final NodePrototype formPrototype = NodePrototype(
+final NodeDefinition formDefinition = NodeDefinition(
   type: 'form',
   label: 'Form',
   icon: Icons.edit_note_rounded,
@@ -429,29 +429,29 @@ final NodePrototype formPrototype = NodePrototype(
   ],
 );
 
-final NodePrototypeRegistry workflowPrototypes = NodePrototypeRegistry(
-  <NodePrototype>[
-    triggerPrototype,
-    actionPrototype,
-    conditionPrototype,
-    formPrototype,
-    outputPrototype,
-    formatPrototype,
-    fanOutPrototype,
+final NodeDefinitionRegistry workflowDefinitions = NodeDefinitionRegistry(
+  <NodeDefinition>[
+    triggerDefinition,
+    actionDefinition,
+    conditionDefinition,
+    formDefinition,
+    outputDefinition,
+    formatDefinition,
+    fanOutDefinition,
   ],
-  links: <LinkPrototype>[
+  links: <LinkDefinition>[
     // Two link kinds, one of each sort, because a caption is either the app
-    // user's or the prototype's and never both.
+    // user's or the definition's and never both.
     //
     // A branch names a choice, which is content nobody can compute.
-    const LinkPrototype(
+    const LinkDefinition(
       type: branchLinkType,
       label: EditableLinkLabel(editorTitle: 'Branch label'),
     ),
     // An exit is named after the port it leaves, so its caption renumbers
     // itself when an exit in the middle is unwired. Nothing is stored: the
     // caption is worked out fresh whenever the geometry is.
-    LinkPrototype(
+    LinkDefinition(
       type: exitLinkType,
       label: DerivedLinkLabel(build: (context) => context.fromPort?.label),
     ),
@@ -461,9 +461,9 @@ final NodePrototypeRegistry workflowPrototypes = NodePrototypeRegistry(
 /// Seeds for the two derived nodes.
 ///
 /// Note how little there is: no ports, no height. Adding one of these to a
-/// controller resolves it, and the prototype fills the rest in — which is also
+/// controller resolves it, and the definition fills the rest in — which is also
 /// why a document only has to persist the fields.
-abstract final class PrototypeNodes {
+abstract final class DefinitionNodes {
   static GraphNode format({
     required String id,
     required Offset position,

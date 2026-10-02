@@ -293,7 +293,7 @@ void main() {
     final state = tester.state<NodeEditorState>(find.byType(NodeEditor));
 
     expect(
-      controller.prototypes.allowsLabelEditing(
+      controller.definitions.allowsLabelEditing(
         controller.graph.connection('c1')!,
       ),
       isFalse,

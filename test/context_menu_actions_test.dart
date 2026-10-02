@@ -26,7 +26,7 @@ void main() {
   Future<NodeEditorController> boot(
     WidgetTester tester, {
     NodeGraph? graph,
-    NodePrototypeRegistry? prototypes,
+    NodeDefinitionRegistry? definitions,
     NodeEditorMenus? menus = const NodeEditorMenus(),
     void Function(GraphNode node, Offset globalPosition)? onNodeSecondaryTap,
   }) async {
@@ -39,7 +39,7 @@ void main() {
               node('b', const Offset(420, 100)),
             ],
           ),
-      prototypes: prototypes,
+      definitions: definitions,
     );
     addTearDown(controller.dispose);
     await tester.pumpWidget(
@@ -238,8 +238,8 @@ void main() {
     final controller = await boot(
       tester,
       graph: NodeGraph(nodes: <GraphNode>[node('a', const Offset(100, 100))]),
-      prototypes: NodePrototypeRegistry(const <NodePrototype>[
-        NodePrototype(type: 'note', label: 'Note'),
+      definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+        NodeDefinition(type: 'note', label: 'Note'),
       ]),
     );
 

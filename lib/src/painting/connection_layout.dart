@@ -9,7 +9,7 @@ import '../geometry/connection_path.dart';
 import '../geometry/connection_router.dart';
 import '../model/node_connection.dart';
 import '../model/node_port.dart';
-import '../prototype/node_prototype_registry.dart';
+import '../definition/node_definition_registry.dart';
 
 /// Cached geometry for one connection, in scene coordinates.
 class ConnectionGeometry {
@@ -138,7 +138,7 @@ class ConnectionLayout {
   double _builtCornerRadius = double.nan;
   double _builtArrowSpacing = double.nan;
   int _builtMaxArrows = -1;
-  NodePrototypeRegistry? _builtRegistry;
+  NodeDefinitionRegistry? _builtRegistry;
 
   /// Whether the settings a curve was built under still hold. All of them are
   /// baked into the cached path or its arrows, so a change to any is the one
@@ -187,7 +187,7 @@ class ConnectionLayout {
     _rebuildCount++;
 
     final graph = controller.graph;
-    final registry = controller.prototypes;
+    final registry = controller.definitions;
     // Curvature is baked into every path and the registry decides every
     // caption, so a change to either is the one case with nothing to reuse.
     final reusable = _settingsHold && identical(_builtRegistry, registry);

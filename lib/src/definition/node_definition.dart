@@ -5,7 +5,7 @@ import '../model/node_port.dart';
 import 'node_execution.dart';
 import 'node_resolution.dart';
 
-/// A group of ports a prototype owns.
+/// A group of ports a definition owns.
 ///
 /// Families are the unit of the static/dynamic choice: a node can hold a fixed
 /// input and a variadic output and have only the second re-derive. They are
@@ -15,14 +15,14 @@ import 'node_resolution.dart';
 sealed class PortFamily {
   const PortFamily({required this.id});
 
-  /// Unique within the prototype, and stamped onto every port it produces.
+  /// Unique within the definition, and stamped onto every port it produces.
   final String id;
 }
 
 /// A family whose ports never change.
 ///
 /// Still owned, which is the point: the ports are re-materialised on every
-/// pass, so editing the prototype propagates a renamed label or a moved anchor
+/// pass, so editing the definition propagates a renamed label or a moved anchor
 /// to nodes that already exist.
 final class StaticPortFamily extends PortFamily {
   const StaticPortFamily({required super.id, required this.ports});
@@ -37,7 +37,7 @@ final class DynamicPortFamily extends PortFamily {
   final PortFamilyBuilder build;
 }
 
-/// A group of [GraphNode.data] keys a prototype owns.
+/// A group of [GraphNode.data] keys a definition owns.
 @immutable
 sealed class FieldFamily {
   const FieldFamily({required this.id});
@@ -55,7 +55,7 @@ final class StaticFieldFamily extends FieldFamily {
 /// A family whose declared fields depend on the node's current values.
 ///
 /// [keyPrefix] is what makes pruning possible. Keys beneath it are the
-/// prototype's to manage, so a value whose field has gone can be dropped
+/// definition's to manage, so a value whose field has gone can be dropped
 /// without the package having to remember what it declared last time — and
 /// everything outside it stays the host's business.
 final class DynamicFieldFamily extends FieldFamily {
@@ -69,7 +69,7 @@ final class DynamicFieldFamily extends FieldFamily {
   final FieldFamilyBuilder build;
 }
 
-/// One entry in [GraphNode.data], as the prototype declares it.
+/// One entry in [GraphNode.data], as the definition declares it.
 ///
 /// The package stores the value and nothing else: [data] carries whatever the
 /// host's editor switches on — a type tag, a range, a picker hint.
@@ -88,10 +88,10 @@ class NodeField {
   final String? label;
 
   /// What this control on the card does, in prose — the field's half of
-  /// [NodePrototype.description].
+  /// [NodeDefinition.description].
   ///
   /// Unlike a port's, a field is never serialised: a node stores the *value*
-  /// under [key] and the declaration stays on the prototype, so this costs a
+  /// under [key] and the declaration stays on the definition, so this costs a
   /// document nothing and needs no care around equality.
   final String? description;
 
@@ -116,8 +116,8 @@ class NodeField {
 
 /// The rule that normalises one kind of node.
 ///
-/// Where a conventional prototype is a template stamped out once, this is a
-/// reduction rule applied continuously: given what the node's fields say and
+/// Not a template stamped out once — which is why it is not called a
+/// prototype — but a reduction rule applied continuously: given what the node's fields say and
 /// what its links look like right now, it returns the ports, fields and height
 /// that node *should* have. Resolution rewrites the node to match, so ports
 /// become derived state rather than something the document authors by hand.
@@ -127,8 +127,8 @@ class NodeField {
 /// wired — and it is why a document only has to persist the fields: the ports
 /// come back on their own.
 @immutable
-class NodePrototype {
-  const NodePrototype({
+class NodeDefinition {
+  const NodeDefinition({
     required this.type,
     this.label,
     this.icon,
@@ -147,16 +147,16 @@ class NodePrototype {
     this.onExecute,
     this.pure = true,
     this.maxPasses = 8,
-  }) : assert(maxPasses > 0, 'a prototype needs at least one pass');
+  }) : assert(maxPasses > 0, 'a definition needs at least one pass');
 
   /// Matched against [GraphNode.type].
   final String type;
 
   /// The name a person sees, where [type] is the name the document uses.
   ///
-  /// It doubles as the opt-in for the editor's "Create" menu: a prototype
+  /// It doubles as the opt-in for the editor's "Create" menu: a definition
   /// without one is not offered there. That saves a second flag, and it means
-  /// a prototype only ends up in a palette once somebody has decided what to
+  /// a definition only ends up in a palette once somebody has decided what to
   /// call it.
   final String? label;
 
@@ -165,7 +165,7 @@ class NodePrototype {
 
   /// Groups this node with its siblings in the "Create" menu.
   ///
-  /// Null leaves it ungrouped; a menu whose prototypes set no category at all
+  /// Null leaves it ungrouped; a menu whose definitions set no category at all
   /// is rendered flat rather than under one heading.
   final String? category;
 
@@ -173,7 +173,7 @@ class NodePrototype {
   ///
   /// The editor's node menu offers it read-only, and offers nothing when this
   /// is null — help text belongs to the kind of node, written once by whoever
-  /// wrote the prototype, not to each copy on the canvas.
+  /// wrote the definition, not to each copy on the canvas.
   ///
   /// A plain string, and deliberately not a document: whether the host writes
   /// prose or Markdown here is the host's to decide and `NodeEditor`'s
@@ -186,7 +186,7 @@ class NodePrototype {
   ///
   /// A seed, not a rule: resolution never touches [GraphNode.width], because
   /// a width the app user has since chosen is theirs. It only saves a palette
-  /// from having to know a number that belongs to the prototype.
+  /// from having to know a number that belongs to the definition.
   final double? defaultWidth;
 
   /// Whether a person may drag a node's bottom-right corner to resize it.
@@ -199,7 +199,7 @@ class NodePrototype {
   /// [GraphNode.minHeight]: what [resolveHeight] or the content says is the
   /// least the node can be, the corner can only add room below it, and the
   /// ports stay on their rows because every anchor is a fraction of the
-  /// declared height rather than of the box. A prototype that would rather
+  /// declared height rather than of the box. A definition that would rather
   /// use the room than leave it blank reads the floor in [resolveHeight].
   final bool resizable;
 

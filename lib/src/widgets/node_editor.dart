@@ -128,7 +128,7 @@ class NodeEditor extends StatefulWidget {
 
   /// Asked for a new caption when the app user taps a captionable link.
   ///
-  /// Only links whose [LinkPrototype] opts in are tappable this way. Return the
+  /// Only links whose [LinkDefinition] opts in are tappable this way. Return the
   /// new caption, an empty string to clear it, or null to leave it alone.
   /// Defaults to [showConnectionLabelEditor].
   final Future<String?> Function(
@@ -161,7 +161,7 @@ class NodeEditor extends StatefulWidget {
   /// show it as plain selectable text.
   ///
   /// **The package will not decide what a description is written in.**
-  /// [NodePrototype.description] is a string, and whether it is prose, Markdown
+  /// [NodeDefinition.description] is a string, and whether it is prose, Markdown
   /// or something a host invented is the host's business — a package that
   /// rendered Markdown would be a package that depends on a Markdown renderer,
   /// which is a dependency every consumer pays for one dialog. So the default
@@ -549,7 +549,7 @@ class NodeEditorState extends State<NodeEditor>
   /// The first port on [node] a wire out of [source] is allowed to land on.
   ///
   /// Declaration order decides, so which port a node "catches with" is a
-  /// property of its prototype rather than of where the pointer happened to
+  /// property of its definition rather than of where the pointer happened to
   /// be. Shared by the drop-onto-a-node path and drop-to-create.
   PortRef? _firstCompatiblePort(GraphNode node, PortRef source) {
     for (final candidate in node.ports) {
@@ -736,7 +736,7 @@ class NodeEditorState extends State<NodeEditor>
   /// Captions are canvas text, so this asks [ConnectionLabel] for the very box
   /// the painter drew rather than guessing at one.
   String? _editableCaptionAt(Offset localPosition) {
-    final registry = _controller.prototypes;
+    final registry = _controller.definitions;
     final visible = _viewport.visibleSceneRect(_viewportSize);
     final style = _labelStyle();
 
@@ -771,7 +771,7 @@ class NodeEditorState extends State<NodeEditor>
         : showConnectionLabelEditor(
             context,
             initialValue: connection.label,
-            title: _controller.prototypes.editorTitleFor(connection),
+            title: _controller.definitions.editorTitleFor(connection),
           );
 
     final result = await pending;
@@ -1220,7 +1220,7 @@ class NodeEditorState extends State<NodeEditor>
   /// Starts resizing [node] from its bottom-right corner, as one undo step.
   ///
   /// The width is the node's own. The height is a floor —
-  /// [GraphNode.minHeight] — under what the prototype or the content already
+  /// [GraphNode.minHeight] — under what the definition or the content already
   /// says: the corner adds room below the rows and never takes it away, so
   /// the handles stay on the rows they were wired to. Dragged back to the
   /// natural height or under it, the floor is cleared rather than left as a
@@ -1241,8 +1241,8 @@ class NodeEditorState extends State<NodeEditor>
     final resize = _resize;
     if (resize == null) return;
     final node = _controller.graph.nodes[resize.id];
-    final prototype = _controller.prototypes[node?.type ?? ''];
-    if (node == null || prototype == null) return;
+    final definition = _controller.definitions[node?.type ?? ''];
+    if (node == null || definition == null) return;
 
     // Pointer deltas arrive in screen pixels; the box lives in scene units.
     final delta = (globalPosition - resize.origin) / _viewport.scale;
@@ -1259,12 +1259,12 @@ class NodeEditorState extends State<NodeEditor>
     final width = edge(
       node.position.dx,
       resize.size.width + delta.dx,
-    ).clamp(prototype.resizeFloor, prototype.maxWidth ?? double.infinity);
+    ).clamp(definition.resizeFloor, definition.maxWidth ?? double.infinity);
     final natural = _controller.layout.anchorSizeOf(node).height;
     final wanted = edge(
       node.position.dy,
       resize.size.height + delta.dy,
-    ).clamp(natural, prototype.maxHeight ?? double.infinity);
+    ).clamp(natural, definition.maxHeight ?? double.infinity);
     final double? floor = wanted > natural ? wanted : null;
 
     if (width == node.width && floor == node.minHeight) return;
@@ -1509,7 +1509,7 @@ class NodeEditorState extends State<NodeEditor>
       showNodeDescription(
         context,
         description: description,
-        title: _controller.prototypes[node.type]?.label ?? node.type,
+        title: _controller.definitions[node.type]?.label ?? node.type,
         builder: widget.descriptionBuilder,
       ),
     );
@@ -1862,7 +1862,7 @@ class NodeEditorState extends State<NodeEditor>
                       hoveredId: _hoveredConnectionId,
                       hoveredWaypoint: _hoveredWaypoint,
                       labelStyle: _labelStyle(),
-                      prototypes: _controller.prototypes,
+                      definitions: _controller.definitions,
                     ),
                     size: size,
                   ),
@@ -2271,7 +2271,8 @@ class _NodeSlot {
         // A fact about the kind of node, read off the registry: the slot's
         // cache already keys on the node, and the registry does not change
         // under a controller.
-        resizable: editor._controller.prototypes[node.type]?.resizable ?? false,
+        resizable:
+            editor._controller.definitions[node.type]?.resizable ?? false,
         onResizeStart: _onResizeStart,
         onResizeUpdate: _editor._handleNodeResizeUpdate,
         onResizeEnd: _editor._handleNodeResizeEnd,

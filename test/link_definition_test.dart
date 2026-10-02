@@ -31,11 +31,11 @@ void main() {
         ],
       );
 
-  NodePrototypeRegistry registry({bool editable = true}) =>
-      NodePrototypeRegistry(
-        const <NodePrototype>[],
-        links: <LinkPrototype>[
-          LinkPrototype(
+  NodeDefinitionRegistry registry({bool editable = true}) =>
+      NodeDefinitionRegistry(
+        const <NodeDefinition>[],
+        links: <LinkDefinition>[
+          LinkDefinition(
             type: 'branch',
             label: editable ? const EditableLinkLabel() : null,
           ),
@@ -77,7 +77,7 @@ void main() {
   }
 
   group('the toggle', () {
-    test('is off unless a link prototype opts in', () {
+    test('is off unless a link definition opts in', () {
       const connection = NodeConnection(
         id: 'c1',
         from: PortRef('a', 'out'),
@@ -88,7 +88,7 @@ void main() {
       expect(registry().allowsLabelEditing(connection), isTrue);
       expect(registry(editable: false).allowsLabelEditing(connection), isFalse);
       expect(
-        NodePrototypeRegistry.empty.allowsLabelEditing(connection),
+        NodeDefinitionRegistry.empty.allowsLabelEditing(connection),
         isFalse,
       );
       expect(
@@ -193,7 +193,7 @@ void main() {
           node('b', position: const Offset(520, 240)),
         ],
       ),
-      prototypes: registry(),
+      definitions: registry(),
     );
     addTearDown(controller.dispose);
     await tester.pumpWidget(harness(controller));
@@ -206,7 +206,7 @@ void main() {
 
     expect(controller.graph.connection(id)!.type, 'branch');
     expect(
-      controller.prototypes.allowsLabelEditing(
+      controller.definitions.allowsLabelEditing(
         controller.graph.connection(id)!,
       ),
       isTrue,
@@ -223,10 +223,10 @@ void main() {
   });
 
   group('derived captions', () {
-    NodePrototypeRegistry derived() => NodePrototypeRegistry(
-      const <NodePrototype>[],
-      links: <LinkPrototype>[
-        LinkPrototype(
+    NodeDefinitionRegistry derived() => NodeDefinitionRegistry(
+      const <NodeDefinition>[],
+      links: <LinkDefinition>[
+        LinkDefinition(
           type: 'branch',
           label: DerivedLinkLabel(build: (context) => context.fromPort?.label),
         ),
@@ -243,14 +243,14 @@ void main() {
 
       expect(derived().allowsLabelEditing(connection), isFalse);
       expect(
-        const LinkPrototype(
+        const LinkDefinition(
           type: 'branch',
           label: DerivedLinkLabel(build: _never),
         ).editableLabel,
         isFalse,
       );
       expect(
-        const LinkPrototype(
+        const LinkDefinition(
           type: 'branch',
           label: EditableLinkLabel(),
         ).editableLabel,
@@ -311,7 +311,7 @@ void main() {
             ),
           ],
         ),
-        prototypes: derived(),
+        definitions: derived(),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -359,7 +359,7 @@ void main() {
             ),
           ],
         ),
-        prototypes: derived(),
+        definitions: derived(),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -372,13 +372,13 @@ void main() {
     });
   });
 
-  testWidgets('the editor title comes from the prototype', (tester) async {
+  testWidgets('the editor title comes from the definition', (tester) async {
     final controller = NodeEditorController(
       graph: twoWired(),
-      prototypes: NodePrototypeRegistry(
-        const <NodePrototype>[],
-        links: const <LinkPrototype>[
-          LinkPrototype(
+      definitions: NodeDefinitionRegistry(
+        const <NodeDefinition>[],
+        links: const <LinkDefinition>[
+          LinkDefinition(
             type: 'branch',
             label: EditableLinkLabel(editorTitle: 'Name this choice'),
           ),
@@ -398,7 +398,7 @@ void main() {
     testWidgets('opens an editor and writes the result back', (tester) async {
       final controller = NodeEditorController(
         graph: twoWired(),
-        prototypes: registry(),
+        definitions: registry(),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -419,7 +419,7 @@ void main() {
     testWidgets('gives an uncaptioned link its first caption', (tester) async {
       final controller = NodeEditorController(
         graph: twoWired(label: null),
-        prototypes: registry(),
+        definitions: registry(),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -437,7 +437,7 @@ void main() {
     testWidgets('backing out of the editor changes nothing', (tester) async {
       final controller = NodeEditorController(
         graph: twoWired(),
-        prototypes: registry(),
+        definitions: registry(),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -458,7 +458,7 @@ void main() {
     ) async {
       final controller = NodeEditorController(
         graph: twoWired(),
-        prototypes: registry(editable: false),
+        definitions: registry(editable: false),
       );
       addTearDown(controller.dispose);
       await tester.pumpWidget(harness(controller));
@@ -477,7 +477,7 @@ void main() {
     testWidgets('the host can supply its own editor', (tester) async {
       final controller = NodeEditorController(
         graph: twoWired(),
-        prototypes: registry(),
+        definitions: registry(),
       );
       addTearDown(controller.dispose);
       NodeConnection? asked;

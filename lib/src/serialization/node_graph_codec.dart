@@ -9,8 +9,8 @@ import '../model/node_graph.dart';
 import '../model/node_group.dart';
 import '../model/node_port.dart';
 import '../model/port_ref.dart';
-import '../prototype/link_prototype.dart';
-import '../prototype/node_prototype_registry.dart';
+import '../definition/link_definition.dart';
+import '../definition/node_definition_registry.dart';
 import 'document_exceptions.dart';
 import 'document_migrations.dart';
 import 'document_reader.dart';
@@ -22,7 +22,7 @@ enum PortStorage {
   /// Every port, grouped by the family that produced it. The safe default.
   all,
 
-  /// Only the host's own ports, leaving family-stamped ones for the prototype
+  /// Only the host's own ports, leaving family-stamped ones for the definition
   /// to re-derive on load.
   ///
   /// Correct only when every dynamic family is a pure function of the node's
@@ -53,7 +53,7 @@ enum PortStorage {
 class NodeGraphCodec {
   const NodeGraphCodec({
     PayloadCodecs? payloads,
-    this.prototypes,
+    this.definitions,
     this.ports = PortStorage.all,
     this.storeDerivedLabels = false,
     this.migrations = GraphDocumentMigrations.standard,
@@ -76,14 +76,14 @@ class NodeGraphCodec {
   /// Never needed to read a document: a node whose type nobody claims decodes
   /// into a perfectly ordinary [GraphNode], which is why an unknown type
   /// degrades instead of aborting the load.
-  final NodePrototypeRegistry? prototypes;
+  final NodeDefinitionRegistry? definitions;
 
   final PortStorage ports;
 
   /// Whether to write a caption a [DerivedLinkLabel] would recompute anyway.
   ///
   /// Off by default: the value is never read back. Turn it on for a consumer
-  /// that reads documents without having the prototypes to hand.
+  /// that reads documents without having the definitions to hand.
   final bool storeDerivedLabels;
 
   final Map<int, GraphDocumentMigration> migrations;
@@ -224,7 +224,8 @@ class NodeGraphCodec {
     var index = 0;
 
     for (final group
-        in prototypes?.fieldGroupsOf(graph, node) ?? const <NodeFieldGroup>[]) {
+        in definitions?.fieldGroupsOf(graph, node) ??
+            const <NodeFieldGroup>[]) {
       final values = <String, Object?>{};
       for (final key in group.keys) {
         if (!node.data.containsKey(key) || !claimed.add(key)) continue;
@@ -340,7 +341,7 @@ class NodeGraphCodec {
     // writing it only puts something in the file that can go stale.
     final derived =
         !storeDerivedLabels &&
-        prototypes?.linkPrototype(connection.type)?.label is DerivedLinkLabel;
+        definitions?.linkDefinition(connection.type)?.label is DerivedLinkLabel;
 
     return <String, Object?>{
       'id': connection.id,

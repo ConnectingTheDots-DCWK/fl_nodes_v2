@@ -13,7 +13,7 @@ built for the web from `master` by `../.github/workflows/demo.yml`.
 
 What it covers:
 
-- Seven node types, all registered prototypes, all creatable from the canvas
+- Seven node types, all registered definitions, all creatable from the canvas
   menu.
 - A **Form** node whose body is real Flutter input — text field, checkbox,
   slider, colour menu — keeping focus and state through drags and reselection.

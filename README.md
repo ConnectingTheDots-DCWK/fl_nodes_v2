@@ -101,7 +101,7 @@ Four value types, all immutable:
 `type` and `data` are yours. The package never interprets them; your
 `nodeBuilder` switches on `type` and reads `data`. `metadata` is for what your
 *user* attaches to a node — notes, tags — kept apart from `data` because a
-prototype shapes `data` and may prune a key it stopped declaring; the editor
+definition shapes `data` and may prune a key it stopped declaring; the editor
 never reads it, and `controller.setNodeMetadata` is the one way to write it.
 
 ### The controller
@@ -182,7 +182,7 @@ Nodes declare a `width`. `height` is optional:
   frame; `controller.layout.hasUnmeasuredNodes` reports when extents are
   provisional.
 
-A prototype with `resizable: true` gets a grip in the node's bottom-right
+A definition with `resizable: true` gets a grip in the node's bottom-right
 corner, bounded by `minWidth`, `maxWidth` and `maxHeight`; with snapping on it
 is the dragged *edge* that is pulled onto a grid line, before those limits are
 applied. The width dragged is
@@ -278,9 +278,10 @@ around cards: the waypoints are what a wire is taken around a card with, and a
 straight leg under a card shows it where a swoop does not — which is why
 curved is the default.
 
-### Prototypes
+### Definitions
 
-A prototype is not a template stamped out once — it is a **reduction rule**.
+A definition is not a template stamped out once, as a prototype would be — it
+is a **reduction rule**.
 Given what a node's fields say and how it is wired *right now*, it returns the
 ports, fields and height that node should have, and the controller rewrites the
 node to match. Ports become derived state rather than something the document
@@ -290,7 +291,7 @@ That is what lets ports appear on demand: one input per placeholder in a format
 string, one more exit each time the last free one is wired.
 
 ```dart
-final printNode = NodePrototype(
+final printNode = NodeDefinition(
   type: 'print',
   label: 'Print',                    // also its opt-in to the Create menu
   icon: Icons.print,
@@ -313,23 +314,23 @@ final printNode = NodePrototype(
   ],
 );
 
-NodeEditorController(prototypes: NodePrototypeRegistry(<NodePrototype>[printNode]));
+NodeEditorController(definitions: NodeDefinitionRegistry(<NodeDefinition>[printNode]));
 ```
 
-Prototypes are optional. Without a registry the controller behaves exactly as it
-would otherwise, and a node whose `type` no prototype claims is never touched.
+Definitions are optional. Without a registry the controller behaves exactly as it
+would otherwise, and a node whose `type` no definition claims is never touched.
 
 **Families** are the unit of ownership, so a node can have a fixed input and a
 variadic output with only the second re-deriving:
 
 | | |
 | --- | --- |
-| `StaticPortFamily` | A constant list, still owned — re-materialised every pass, so renaming a label in the prototype reaches nodes that already exist. |
+| `StaticPortFamily` | A constant list, still owned — re-materialised every pass, so renaming a label in the definition reaches nodes that already exist. |
 | `DynamicPortFamily` | Rebuilt from the node's fields and links on every pass. |
 | *foreign* | A port carrying no `family`. Yours; never rewritten or removed. |
 
 If a generated port has the same id as a hand-authored one, the generated port
-adopts it — that is how you point a prototype at a document whose ports were
+adopts it — that is how you point a definition at a document whose ports were
 written by hand.
 
 A builder must **settle**: given its own output it must return the same thing
@@ -342,11 +343,11 @@ lists and its Description item shows.
 
 ### Execution
 
-A prototype's `onExecute` is what its node *does*; `controller.runner` walks the
+A definition's `onExecute` is what its node *does*; `controller.runner` walks the
 graph and calls them.
 
 ```dart
-NodePrototype(
+NodeDefinition(
   type: 'greet',
   onExecute: (context) async {
     final name = context.input<String>('name') ?? context.fieldOr('name', '');
@@ -547,8 +548,8 @@ Right-click a node, a port, a wire or the canvas. Menus are built from
 | Group | Cut, Copy, Delete with contents, Disband, Rename, Colour ▸ |
 | Canvas | Center view, Reset zoom, Paste, Create ▸, Add comment, Project ▸ |
 
-Create ▸ lists every prototype that declares a `label`, grouped by `category`.
-Description shows a prototype's `description`, read-only. Open and Save are
+Create ▸ lists every definition that declares a `label`, grouped by `category`.
+Description shows a definition's `description`, read-only. Open and Save are
 disabled until `controller.project` has a `source` and a `sink`.
 
 Entries are data, so a host filters the defaults rather than rebuilding them:
@@ -600,7 +601,7 @@ Give the controller a `NodeGraphCodec` and every copy is *also* written to the
 system clipboard as JSON, which is what carries a selection between windows:
 
 ```dart
-NodeEditorController(prototypes: prototypes, codec: NodeGraphCodec(prototypes: prototypes));
+NodeEditorController(definitions: definitions, codec: NodeGraphCodec(definitions: definitions));
 await controller.clipboard.pasteFromSystem();  // falls back to the buffer
 ```
 
@@ -752,7 +753,7 @@ without pumping a widget.
 | --- | --- | --- |
 | Model | `NodeGraph`, `GraphNode`, `NodePort`, `NodeConnection`, `NodeGroup`, `PortRef` | geometry only |
 | Geometry | `ViewportTransform`, `NodeGeometry`, `ConnectionPath`, `ConnectionRouter`, `MinimapProjection` | geometry only |
-| Prototype | `NodePrototype`, `PortFamily`, `FieldFamily`, `NodePrototypeRegistry` | geometry only |
+| Definition | `NodeDefinition`, `PortFamily`, `FieldFamily`, `NodeDefinitionRegistry` | geometry only |
 | Serialisation | `NodeGraphCodec`, `GraphDocument`, `PayloadCodecs` | geometry only |
 | Controller | `NodeEditorController` and its subsystems, `SpatialHashGrid`, `MinimapController` | `ChangeNotifier` |
 | View | `NodeEditor`, `NodeView`, `ConnectionLayout`, painters, `NodeEditorTheme`, `MinimapConfig` | yes |
@@ -775,10 +776,10 @@ cd example && flutter run
 - An arrangement of its own. `applyLayout` takes one from the host and places
   it; which picture a graph should make is a question about what the nodes
   mean.
-- Resizing a comment. It sizes itself to its text; only a node whose prototype
+- Resizing a comment. It sizes itself to its text; only a node whose definition
   opts in can be resized by hand.
 - Resolution cannot change a node's `position`, `width` or `draggable`.
-  `NodePrototype.defaultWidth` seeds `instantiate` but is not enforced after.
+  `NodeDefinition.defaultWidth` seeds `instantiate` but is not enforced after.
 
 ## License
 

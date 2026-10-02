@@ -138,13 +138,13 @@ void main() {
 
     controller.dispose();
 
-    // --- prototype resolution ---------------------------------------------
+    // --- definition resolution ---------------------------------------------
     // The question is whether normalising nodes costs anything on the paths
     // that run every frame. It must not: dragging seeds no nodes to resolve,
     // so it never enters the resolver at all.
-    final prototyped = buildBig()
-      ..prototypes = NodePrototypeRegistry(<NodePrototype>[
-        NodePrototype(
+    final defined = buildBig()
+      ..definitions = NodeDefinitionRegistry(<NodeDefinition>[
+        NodeDefinition(
           type: 'default',
           ports: <PortFamily>[
             const StaticPortFamily(
@@ -160,25 +160,25 @@ void main() {
     var y = 0.0;
     final protoDrag = timeUs(500, () {
       y += 1;
-      prototyped.moveNodes(<String, Offset>{'n10': Offset(0, y)});
+      defined.moveNodes(<String, Offset>{'n10': Offset(0, y)});
     });
     var tick = 0;
     final protoEdit = timeUs(200, () {
       tick++;
-      prototyped.updateNode(
+      defined.updateNode(
         'n20',
         (node) => node.withData(<String, Object?>{'tick': tick}),
       );
     });
     debugPrint(
       'PROTO  drag=${protoDrag.toStringAsFixed(1)}us '
-      '(vs ${drag.toStringAsFixed(1)}us unprototyped) '
+      '(vs ${drag.toStringAsFixed(1)}us without definitions) '
       'field-edit=${protoEdit.toStringAsFixed(1)}us',
     );
 
     // A single wide variadic family, to price the fixed point itself.
-    final wide = NodePrototypeRegistry(<NodePrototype>[
-      NodePrototype(
+    final wide = NodeDefinitionRegistry(<NodeDefinition>[
+      NodeDefinition(
         type: 'wide',
         ports: <PortFamily>[
           DynamicPortFamily(
@@ -227,6 +227,6 @@ void main() {
       '${wideResolve.toStringAsFixed(1)}us',
     );
 
-    prototyped.dispose();
+    defined.dispose();
   });
 }

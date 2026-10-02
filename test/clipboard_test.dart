@@ -48,7 +48,7 @@ void main() {
 
   /// Keeps every wired exit and always leaves one spare, so the family is a
   /// function of which exits are connected rather than of any stored field.
-  final fanOut = NodePrototype(
+  final fanOut = NodeDefinition(
     type: 'fanout',
     ports: <PortFamily>[
       const StaticPortFamily(
@@ -68,12 +68,12 @@ void main() {
   NodeEditorController controllerWith(
     List<GraphNode> nodes, {
     List<NodeConnection> connections = const <NodeConnection>[],
-    NodePrototypeRegistry? prototypes,
+    NodeDefinitionRegistry? definitions,
     NodeGraphCodec? codec,
   }) {
     final controller = NodeEditorController(
       graph: NodeGraph(nodes: nodes, connections: connections),
-      prototypes: prototypes,
+      definitions: definitions,
       codec: codec,
     );
     addTearDown(controller.dispose);
@@ -311,12 +311,12 @@ void main() {
     });
   });
 
-  group('prototypes', () {
+  group('definitions', () {
     NodeEditorController fanOutController() {
       final controller = controllerWith(<GraphNode>[
         const GraphNode(id: 'f', type: 'fanout', position: Offset.zero),
         node('sink', position: const Offset(400, 0)),
-      ], prototypes: NodePrototypeRegistry(<NodePrototype>[fanOut]));
+      ], definitions: NodeDefinitionRegistry(<NodeDefinition>[fanOut]));
       controller.connect(
         const PortRef('f', 'out_0'),
         const PortRef('sink', 'in'),

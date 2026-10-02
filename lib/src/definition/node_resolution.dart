@@ -5,7 +5,7 @@ import '../model/node_connection.dart';
 import '../model/node_graph.dart';
 import '../model/node_port.dart';
 import '../model/port_ref.dart';
-import 'node_prototype.dart';
+import 'node_definition.dart';
 
 /// Builds one port family's ports from the node's current state.
 ///
@@ -32,7 +32,7 @@ typedef FieldFamilyBuilder =
 /// Returns the node's declared height, or null to size it to its content.
 typedef NodeHeightResolver = double? Function(NodeResolutionContext context);
 
-/// Carries field values across an iteration of the prototype.
+/// Carries field values across an iteration of the definition.
 typedef NodeFieldMerge =
     Map<String, Object?> Function(NodeFieldMergeContext context);
 
@@ -102,9 +102,9 @@ class NodeResolutionContext {
 
   /// The host's own ports — the ones carrying no family stamp.
   ///
-  /// Resolution never touches these, which is what lets a prototyped node keep
+  /// Resolution never touches these, which is what lets a node with a definition keep
   /// hand-authored ports alongside generated ones. A port stamped with a family
-  /// the prototype no longer declares is *not* foreign: it is left over from an
+  /// the definition no longer declares is *not* foreign: it is left over from an
   /// earlier version of the rule, and resolution retires it.
   List<NodePort> get foreignPorts => <NodePort>[
     for (final port in node.ports)
@@ -154,7 +154,7 @@ class NodeFieldMergeContext {
   final List<NodeField> declared;
 
   /// The [DynamicFieldFamily.keyPrefix] of every dynamic field family on the
-  /// prototype — the keys it is allowed to drop.
+  /// definition — the keys it is allowed to drop.
   final Set<String> managedPrefixes;
 
   final int pass;
@@ -165,14 +165,14 @@ class NodeFieldMergeContext {
     for (final field in declared) field.key,
   };
 
-  /// Whether [key] falls in a namespace the prototype manages.
+  /// Whether [key] falls in a namespace the definition manages.
   bool manages(String key) =>
       managedPrefixes.any((prefix) => key.startsWith(prefix));
 }
 
 /// Ready-made inheritance policies.
 ///
-/// Pass a [NodeFieldMerge] of your own to [NodePrototype.inheritFields] for
+/// Pass a [NodeFieldMerge] of your own to [NodeDefinition.inheritFields] for
 /// anything else — renumbering values when a field is inserted in the middle,
 /// for instance, which no general rule can guess at.
 abstract final class NodeFields {

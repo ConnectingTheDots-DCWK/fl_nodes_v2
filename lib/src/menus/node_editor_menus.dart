@@ -171,7 +171,7 @@ class NodeEditorMenus {
     // Right-clicking selects first, so by the time these run there is always
     // something under them.
     final hasSelection = selection.nodeIds.isNotEmpty;
-    final description = controller.prototypes[node.type]?.description;
+    final description = controller.definitions[node.type]?.description;
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
@@ -419,7 +419,7 @@ class NodeEditorMenus {
       ),
       const NodeMenuEntry.separator(),
       // Nothing to create is not the same as an empty submenu to open: a host
-      // that has named none of its prototypes gets no Create at all.
+      // that has named none of its definitions gets no Create at all.
       if (create.isNotEmpty)
         NodeMenuEntry(label: 'Create', icon: Icons.add, children: create),
       // Its own entry rather than one more line inside Create, so a host that
@@ -450,14 +450,14 @@ class NodeEditorMenus {
     void Function(String type) onCreate,
   ) => _createEntries(request, onCreate);
 
-  /// One entry per prototype that has been given a [NodePrototype.label],
+  /// One entry per definition that has been given a [NodeDefinition.label],
   /// grouped by category when any of them names one.
   List<NodeMenuEntry> _createEntries(
     NodeMenuRequest request, [
     void Function(String type)? onCreate,
   ]) {
     final controller = request.controller;
-    final registry = controller.prototypes;
+    final registry = controller.definitions;
 
     final creatable = <String>[
       for (final type in registry.types)
@@ -465,10 +465,10 @@ class NodeEditorMenus {
     ]..sort((a, b) => registry[a]!.label!.compareTo(registry[b]!.label!));
 
     NodeMenuEntry entryFor(String type) {
-      final prototype = registry[type]!;
+      final definition = registry[type]!;
       return NodeMenuEntry(
-        label: prototype.label!,
-        icon: prototype.icon,
+        label: definition.label!,
+        icon: definition.icon,
         onSelected: onCreate == null
             ? () => createNode(request, type)
             : () => onCreate(type),
@@ -480,7 +480,7 @@ class NodeEditorMenus {
       return <NodeMenuEntry>[for (final type in creatable) entryFor(type)];
     }
 
-    // Ungrouped prototypes sit at the top, above the named groups, rather
+    // Ungrouped definitions sit at the top, above the named groups, rather
     // than under an invented "Other" heading nobody chose.
     final categories = <String, List<NodeMenuEntry>>{};
     final loose = <NodeMenuEntry>[];
@@ -550,7 +550,7 @@ class NodeEditorMenus {
     final controller = request.controller;
     final id = controller.nextId(type);
     controller.addNode(
-      controller.prototypes.instantiate(
+      controller.definitions.instantiate(
         type,
         id: id,
         position: request.scenePosition,

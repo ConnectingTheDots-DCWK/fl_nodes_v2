@@ -22,7 +22,7 @@ void main() {
 
   NodeEditorController boot({
     NodeGraph? graph,
-    NodePrototypeRegistry? prototypes,
+    NodeDefinitionRegistry? definitions,
   }) {
     final controller = NodeEditorController(
       graph:
@@ -33,7 +33,7 @@ void main() {
               node('b', at: const Offset(400, 0)),
             ],
           ),
-      prototypes: prototypes,
+      definitions: definitions,
     );
     addTearDown(controller.dispose);
     return controller;
@@ -90,7 +90,7 @@ void main() {
       );
     });
 
-    test('shows a description only when the prototype declares one', () {
+    test('shows a description only when the definition declares one', () {
       final controller = boot(
         graph: NodeGraph(
           nodes: <GraphNode>[
@@ -100,10 +100,10 @@ void main() {
             node('d', type: 'blank'),
           ],
         ),
-        prototypes: NodePrototypeRegistry(const <NodePrototype>[
-          NodePrototype(type: 'documented', description: 'What it does.'),
-          NodePrototype(type: 'bare'),
-          NodePrototype(type: 'blank', description: '   '),
+        definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+          NodeDefinition(type: 'documented', description: 'What it does.'),
+          NodeDefinition(type: 'bare'),
+          NodeDefinition(type: 'blank', description: '   '),
         ]),
       );
 
@@ -121,7 +121,7 @@ void main() {
       expect(
         forNode('c'),
         isNot(contains('Description')),
-        reason: 'a node whose type has no prototype has nowhere to keep one',
+        reason: 'a node whose type has no definition has nowhere to keep one',
       );
       expect(
         forNode('d'),
@@ -357,10 +357,10 @@ void main() {
       expect(find(entries, 'Center view').isEnabled, isFalse);
     });
 
-    test('no Create submenu when no prototype is named', () {
+    test('no Create submenu when no definition is named', () {
       final controller = boot(
-        prototypes: NodePrototypeRegistry(const <NodePrototype>[
-          NodePrototype(type: 'plain'),
+        definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+          NodeDefinition(type: 'plain'),
         ]),
       );
 
@@ -375,12 +375,12 @@ void main() {
       );
     });
 
-    test('Create lists named prototypes alphabetically, flat', () {
+    test('Create lists named definitions alphabetically, flat', () {
       final controller = boot(
-        prototypes: NodePrototypeRegistry(const <NodePrototype>[
-          NodePrototype(type: 'z', label: 'Alpha'),
-          NodePrototype(type: 'a', label: 'Beta'),
-          NodePrototype(type: 'hidden'),
+        definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+          NodeDefinition(type: 'z', label: 'Alpha'),
+          NodeDefinition(type: 'a', label: 'Beta'),
+          NodeDefinition(type: 'hidden'),
         ]),
       );
 
@@ -396,11 +396,11 @@ void main() {
 
     test('Create groups by category once one is named', () {
       final controller = boot(
-        prototypes: NodePrototypeRegistry(const <NodePrototype>[
-          NodePrototype(type: 'a', label: 'Loose'),
-          NodePrototype(type: 'b', label: 'Split', category: 'Flow'),
-          NodePrototype(type: 'c', label: 'Merge', category: 'Flow'),
-          NodePrototype(type: 'd', label: 'Text', category: 'Data'),
+        definitions: NodeDefinitionRegistry(const <NodeDefinition>[
+          NodeDefinition(type: 'a', label: 'Loose'),
+          NodeDefinition(type: 'b', label: 'Split', category: 'Flow'),
+          NodeDefinition(type: 'c', label: 'Merge', category: 'Flow'),
+          NodeDefinition(type: 'd', label: 'Text', category: 'Data'),
         ]),
       );
 
@@ -415,7 +415,7 @@ void main() {
         labels(create.children),
         <String>['Loose', 'Data', 'Flow'],
         reason:
-            'an uncategorised prototype sits above the groups rather than '
+            'an uncategorised definition sits above the groups rather than '
             'under an "Other" heading nobody asked for',
       );
       expect(labels(find(create.children, 'Flow').children), <String>[
@@ -481,7 +481,7 @@ void main() {
       );
     });
 
-    test('Add comment is offered with no prototypes at all', () {
+    test('Add comment is offered with no definitions at all', () {
       final controller = boot();
       expect(
         labels(

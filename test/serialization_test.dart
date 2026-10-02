@@ -13,7 +13,7 @@ void main() {
 
   /// One input per placeholder, and one literal field per input — a family
   /// whose output is a pure function of `data`.
-  NodePrototype formatPrototype() => NodePrototype(
+  NodeDefinition formatDefinition() => NodeDefinition(
     type: 'format',
     fields: <FieldFamily>[
       const StaticFieldFamily(
@@ -46,7 +46,7 @@ void main() {
 
   /// Every wired exit plus one free — a family whose output depends on link
   /// state, and so cannot be re-derived from `data` alone.
-  NodePrototype fanOutPrototype() => NodePrototype(
+  NodeDefinition fanOutDefinition() => NodeDefinition(
     type: 'fanout',
     ports: <PortFamily>[
       const StaticPortFamily(
@@ -63,11 +63,11 @@ void main() {
     ],
   );
 
-  NodePrototypeRegistry registry() => NodePrototypeRegistry(
-    <NodePrototype>[formatPrototype(), fanOutPrototype()],
-    links: <LinkPrototype>[
-      const LinkPrototype(type: 'branch', label: EditableLinkLabel()),
-      LinkPrototype(
+  NodeDefinitionRegistry registry() => NodeDefinitionRegistry(
+    <NodeDefinition>[formatDefinition(), fanOutDefinition()],
+    links: <LinkDefinition>[
+      const LinkDefinition(type: 'branch', label: EditableLinkLabel()),
+      LinkDefinition(
         type: 'exit',
         label: DerivedLinkLabel(build: (context) => context.fromPort?.label),
       ),
@@ -100,10 +100,10 @@ void main() {
     NodeGraphCodec codec = const NodeGraphCodec(),
   }) => codec.decode(codec.encode(GraphDocument(graph: graph))).graph;
 
-  group('prototypes', () {
+  group('definitions', () {
     test('a wired exit survives a save and load', () {
       final shared = registry();
-      final controller = NodeEditorController(prototypes: shared);
+      final controller = NodeEditorController(definitions: shared);
       addTearDown(controller.dispose);
       controller
         ..addNode(seed('r', type: 'fanout'))
@@ -125,10 +125,10 @@ void main() {
         'out_2',
       ]);
 
-      final codec = NodeGraphCodec(prototypes: shared);
+      final codec = NodeGraphCodec(definitions: shared);
       final json = codec.encode(GraphDocument(graph: controller.graph));
 
-      final reloaded = NodeEditorController(prototypes: shared);
+      final reloaded = NodeEditorController(definitions: shared);
       addTearDown(reloaded.dispose);
       reloaded.replaceGraph(codec.decode(json).graph, recordHistory: false);
 
@@ -151,7 +151,7 @@ void main() {
       'dropping generated ports loses that wire — why the default is all',
       () {
         final shared = registry();
-        final controller = NodeEditorController(prototypes: shared);
+        final controller = NodeEditorController(definitions: shared);
         addTearDown(controller.dispose);
         controller
           ..addNode(seed('r', type: 'fanout'))
@@ -167,10 +167,10 @@ void main() {
         controller.removeConnections(<String>[first]);
 
         final codec = NodeGraphCodec(
-          prototypes: shared,
+          definitions: shared,
           ports: PortStorage.foreign,
         );
-        final reloaded = NodeEditorController(prototypes: shared);
+        final reloaded = NodeEditorController(definitions: shared);
         addTearDown(reloaded.dispose);
         reloaded.replaceGraph(
           codec
@@ -192,14 +192,14 @@ void main() {
 
     test('a family driven by data alone is safe to drop', () {
       final shared = registry();
-      final controller = NodeEditorController(prototypes: shared);
+      final controller = NodeEditorController(definitions: shared);
       addTearDown(controller.dispose);
       controller.addNode(
         seed('a', data: <String, Object?>{'format': '{0} {1}'}),
       );
 
       final codec = NodeGraphCodec(
-        prototypes: shared,
+        definitions: shared,
         ports: PortStorage.foreign,
       );
       final json = codec.encode(GraphDocument(graph: controller.graph));
@@ -209,7 +209,7 @@ void main() {
         reason: 'nothing but generated ports, so nothing is written',
       );
 
-      final reloaded = NodeEditorController(prototypes: shared);
+      final reloaded = NodeEditorController(definitions: shared);
       addTearDown(reloaded.dispose);
       reloaded.replaceGraph(codec.decode(json).graph, recordHistory: false);
 
@@ -254,7 +254,7 @@ void main() {
       );
 
       final json = NodeGraphCodec(
-        prototypes: shared,
+        definitions: shared,
       ).encode(GraphDocument(graph: graph));
       final connections = (json['connections']! as List<Object?>)
           .cast<Map<String, Object?>>();
@@ -263,7 +263,7 @@ void main() {
       expect(connections[1]['label'], 'High');
       expect(
         NodeGraphCodec(
-          prototypes: shared,
+          definitions: shared,
           storeDerivedLabels: true,
         ).encode(GraphDocument(graph: graph))['connections'],
         contains(containsPair('label', 'recomputed anyway')),
@@ -282,7 +282,7 @@ void main() {
         ],
       );
 
-      final codec = NodeGraphCodec(prototypes: registry());
+      final codec = NodeGraphCodec(definitions: registry());
       final decoded = codec.decode(codec.encode(GraphDocument(graph: graph)));
 
       expect(
@@ -296,14 +296,14 @@ void main() {
 
     test('field values keep the family that declared them', () {
       final shared = registry();
-      final controller = NodeEditorController(prototypes: shared);
+      final controller = NodeEditorController(definitions: shared);
       addTearDown(controller.dispose);
       controller.addNode(
         seed('a', data: <String, Object?>{'format': '{0}', 'title': 'mine'}),
       );
 
       final json = NodeGraphCodec(
-        prototypes: shared,
+        definitions: shared,
       ).encode(GraphDocument(graph: controller.graph));
       final groups =
           ((json['nodes']! as List<Object?>).single
@@ -325,7 +325,7 @@ void main() {
 
       // And it all comes back as one flat map.
       expect(
-        NodeGraphCodec(prototypes: shared).decode(json).graph.node('a')!.data,
+        NodeGraphCodec(definitions: shared).decode(json).graph.node('a')!.data,
         controller.graph.node('a')!.data,
       );
     });
@@ -1248,7 +1248,7 @@ void main() {
         decoded.graph.connections,
         hasLength(1),
         reason:
-            'a prototyped document legitimately names ports before they '
+            'a document with definitions legitimately names ports before they '
             'are derived — referential integrity is the resolver\'s job',
       );
     });

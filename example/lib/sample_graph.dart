@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
-import 'prototype_nodes.dart';
+import 'definition_nodes.dart';
 import 'workflow_node.dart';
 
 /// A small automation pipeline, wired up so the demo opens on something worth
@@ -47,14 +47,14 @@ NodeGraph buildSampleGraph() {
         delayMinutes: 15,
       ),
       // These two arrive holding only their fields. Their ports — and the
-      // fan-out's height — are derived by their prototypes when the controller
+      // fan-out's height — are derived by their definitions when the controller
       // takes the document.
-      PrototypeNodes.fanOut(
+      DefinitionNodes.fanOut(
         id: 'route',
         position: const Offset(1300, 300),
         title: 'Route reply',
       ),
-      PrototypeNodes.format(
+      DefinitionNodes.format(
         id: 'greeting',
         position: const Offset(1640, 480),
         title: 'Greeting',
@@ -62,7 +62,7 @@ NodeGraph buildSampleGraph() {
       // A format string with no placeholders is a constant: no argument ports,
       // nothing to pull, one value out. It is what feeds the greeting's first
       // slot, and the shortest demonstration of a data node in the demo.
-      PrototypeNodes.format(
+      DefinitionNodes.format(
         id: 'name',
         position: const Offset(1300, 520),
         title: 'Recipient',

@@ -207,7 +207,7 @@ lookup asserts. `_dragTo` stops the scroll when it finds nothing to drag, which
 is how Escape mid-wire does not leave the camera drifting under a button that
 is still down. `edge_scroll_test.dart`.
 
-**A node's bottom-right corner resizes it when its prototype says
+**A node's bottom-right corner resizes it when its definition says
 `resizable`.** The grip is `CornerGrip`, the minimap's own drawing, and the
 last `NodeView.resizeGripSize` square of the node; it carries **no recogniser
 of its own**. The node's one pan recogniser reads where the press landed and
@@ -221,7 +221,7 @@ or the measured one — and the difference between the two is the room somebody
 dragged open below the rows. Anchors are fractions of the declared height on
 purpose: a card's handles must stay on the rows they were wired to however
 tall the card is made. A measured node is built inside a `ConstrainedBox` at
-its floor, so its content decides and the two sizes agree. A prototype that
+its floor, so its content decides and the two sizes agree. A definition that
 wants the room *used* reads the floor in `resolveHeight`. `_handleNodeResize*`
 bracket the drag in one history transaction, pull the dragged *edge* onto the
 grid (see *Snapping*), clamp to `resizeFloor`/`maxWidth`/`maxHeight` and clear
@@ -459,7 +459,7 @@ mean a host tracking whether a particular node still exists has to *listen* as
 well as guard — `ripple_effect` does exactly that for the node a paused
 campaign is checkpointed on.
 
-The guard is consulted before prototypes are resolved. Resolving first would
+The guard is consulted before definitions are resolved. Resolving first would
 mean a refused edit had already done the expensive half of the work against a
 graph about to be discarded.
 
@@ -498,7 +498,7 @@ measurement would have listeners reading a graph that is about to move.
 
 **`descriptionBuilder` is the third hook of that shape**, beside `portTooltip`
 and `onEditConnectionLabel`: the package holds a description, and the host
-decides what it is written in. A prototype's `description`, a port's and a
+decides what it is written in. A definition's `description`, a port's and a
 field's are all plain strings, because whether they are prose or Markdown is
 not the package's business — and the alternative, rendering Markdown here,
 means a dependency on a Markdown renderer that every consumer pays for one
@@ -510,14 +510,14 @@ extensions already in it.
 load-bearing.** Ports are serialised, and resolution keeps the node it already
 has when `listEquals` says the ports it would build match the ones on it. Put
 prose inside equality and every document written before the prose existed
-differs from what its prototype now builds — so opening one rewrites every node
+differs from what its definition now builds — so opening one rewrites every node
 in it, and a host with an autosave writes a file nobody edited. Serialise it
 instead and the same sentence is copied into every document holding the node.
 So it is stamped on by the family that builds the port and read from there; a
 port that came off a disk carries nothing. `test/node_description_test.dart`
 pins both halves, the last test being that regression written down.
 A **field's** description is neither serialised nor excluded, because a field
-declaration never leaves the prototype — a node stores the value under its key
+declaration never leaves the definition — a node stores the value under its key
 and nothing else.
 
 ## Watching a run
@@ -566,7 +566,7 @@ back to no turn at all.
 **The listener is synchronous, and every event lands before the notification
 that follows it**, so a host that rebuilds from `notifyListeners` finds its
 recorder already up to date. It is read once at the start of a run, like the
-prototypes, so a listener swapped mid-run does not see half of one.
+definitions, so a listener swapped mid-run does not see half of one.
 
 **`emit` takes a builder, not an event.** `NodeStarted` walks every wire into
 the node; with no listener attached the walk must not happen, and a builder
@@ -662,7 +662,7 @@ What that costs, and where it is paid:
 - The runner is safe *by accident and by design*: a note declares no ports, and
   a node with no control ports is `isPureData`, so it sits outside the flow and
   nothing pulls it.
-- Prototype resolution skips it — `resolve` does `if (prototype == null)
+- Definition resolution skips it — `resolve` does `if (definition == null)
   continue`, and nothing may register that type.
 - `_NodeSlot` swaps in the editor's own builder for a note, so the host's
   `nodeBuilder` never sees one. The builder is a field, not a tear-off read per
@@ -852,8 +852,8 @@ cannot edit.
 
 **`GraphNode.metadata` is the package's key on the node, not a host field in
 `data`.** It is what a host's *user* writes about a node — beside `data`
-because `data` is what a prototype shapes and `seedAndPrune` may take an
-unknown key away, and nobody's notes should be a prototype's to prune. The
+because `data` is what a definition shapes and `seedAndPrune` may take an
+unknown key away, and nobody's notes should be a definition's to prune. The
 editor never reads it, resolution never sees it, and `setNodeMetadata` is the
 one mutator. It is the third thing written only when non-empty and read absent
 as empty, after `meta` and `groups`, and it made the bargain `minHeight` made
@@ -955,10 +955,10 @@ warning.**
   in-place mutation with copy-on-checkpoint, and the model's guarantees with it.
 - Resolution cannot change a node's `position`, `width` or `draggable`.
   Position is user state and would fight the drag path; width is a plausible
-  future `resolveSize`. `NodePrototype.defaultWidth` is only a seed for
+  future `resolveSize`. `NodeDefinition.defaultWidth` is only a seed for
   `instantiate`.
 - Comments size themselves to their text and group frames size themselves to
   their members, so neither is resized by hand; a node with a `resizable`
-  prototype has a corner grip.
+  definition has a corner grip.
 - Groups do not nest, and a node belongs to at most one. Both are enforced in
   `putGroup` rather than left to the caller.

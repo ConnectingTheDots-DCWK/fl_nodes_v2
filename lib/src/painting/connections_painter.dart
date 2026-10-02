@@ -5,7 +5,7 @@ import 'package:flutter/rendering.dart';
 import '../geometry/viewport_transform.dart';
 import '../model/node_connection.dart';
 import '../model/node_graph.dart';
-import '../prototype/node_prototype_registry.dart';
+import '../definition/node_definition_registry.dart';
 import '../theme/node_editor_theme.dart';
 import 'connection_label.dart';
 import 'connection_layout.dart';
@@ -29,7 +29,7 @@ class ConnectionsPainter extends CustomPainter {
     this.hoveredId,
     this.hoveredWaypoint,
     this.labelStyle,
-    this.prototypes,
+    this.definitions,
   });
 
   final ConnectionLayout layout;
@@ -54,7 +54,7 @@ class ConnectionsPainter extends CustomPainter {
 
   /// Decides which links are captionable, so those without a caption yet still
   /// draw something to aim at.
-  final NodePrototypeRegistry? prototypes;
+  final NodeDefinitionRegistry? definitions;
 
   /// Below this zoom, arrowheads and labels stop being readable and are
   /// skipped along with their layout cost.
@@ -198,7 +198,7 @@ class ConnectionsPainter extends CustomPainter {
     final caption = ConnectionLabel.captionFor(
       text: geometry.caption,
       anchor: geometry.labelAnchor,
-      editable: prototypes?.allowsLabelEditing(connection) ?? false,
+      editable: definitions?.allowsLabelEditing(connection) ?? false,
       viewport: viewport,
       style: labelStyle,
     );
@@ -225,7 +225,7 @@ class ConnectionsPainter extends CustomPainter {
       final caption = ConnectionLabel.captionFor(
         text: entry.value.caption,
         anchor: anchor,
-        editable: prototypes?.allowsLabelEditing(connection) ?? false,
+        editable: definitions?.allowsLabelEditing(connection) ?? false,
         viewport: viewport,
         style: labelStyle,
       );
@@ -251,7 +251,7 @@ class ConnectionsPainter extends CustomPainter {
       oldDelegate.hoveredId != hoveredId ||
       oldDelegate.hoveredWaypoint != hoveredWaypoint ||
       oldDelegate.selectionRevision != selectionRevision ||
-      !identical(oldDelegate.prototypes, prototypes);
+      !identical(oldDelegate.definitions, definitions);
 }
 
 class _Layer {
