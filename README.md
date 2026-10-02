@@ -231,17 +231,20 @@ label the ones worth labelling and leave the rest alone.
 
 By default the editor refuses same-direction pairs, self-connections,
 duplicates, anything over a port's `maxConnections`, and any pair whose kinds or
-types disagree. `connectionValidator` adds domain rules:
+types disagree. A `connectionValidator` sees every pair that is one output and
+one input on two nodes, as a `ConnectionCheck` — both `PortRef`s, both
+`NodePort`s, the graph — and its answer is final. To add a rule, and it in:
 
 ```dart
 NodeEditorController(
-  connectionValidator: (graph, from, to) =>
-      NodeEditorController.portsCompatible(fromPort, toPort) && myRule(...),
+  connectionValidator: (check) =>
+      check.allowedByDefault && check.toPort.label != 'locked',
 );
 ```
 
-A custom validator *replaces* the default, so call `portsCompatible` yourself if
-you still want the kind and type checks.
+`allowedByDefault` is the package's own verdict on duplicates, capacity and
+`portsCompatible`. A validator that does not read it replaces those checks,
+which is occasionally what you want and is now something you can see.
 
 **Kinds and types.** A port is `PortKind.data` or `PortKind.control`. Data
 carries a value; control carries the flow of execution. They never join.

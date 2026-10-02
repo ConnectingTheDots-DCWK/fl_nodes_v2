@@ -16,6 +16,7 @@ export 'src/controller/graph_edit.dart'
     show GraphEdit, GraphEditKind, GraphEditGuard, GraphEditListener;
 export 'src/controller/node_editor_controller.dart'
     show
+        ConnectionCheck,
         ConnectionValidator,
         GraphDocumentSink,
         GraphDocumentSource,

@@ -451,6 +451,17 @@ graph half-changed while a dialog is open, so a host that needs to ask
 something refuses, asks, and calls the mutator again. The editor has nothing to
 add to a refusal — the host already knows it refused.
 
+**A connection validator is handed the default, not replaced by it.** It used
+to receive `(graph, from, to)` and its answer stood alone, so a host adding one
+rule silently dropped the duplicate, capacity and `portsCompatible` checks —
+the README's own example called `portsCompatible` on ports the callback never
+received. `ConnectionCheck.allowedByDefault` is the package's verdict, a
+`late final` so a validator that ignores it pays nothing on the drag path where
+`canConnect` runs per hovered port. Anding it in adds; not reading it
+replaces, deliberately and visibly. Direction, presence and self-connection
+are never the validator's: `_normalize` refuses those first, because a pair
+that is not one output and one input is not a question about the domain.
+
 **Neither hook sees undo or redo.** `history.undo()` sets `_graph` directly and
 calls `_afterJump`; it does not go through `_mutate`. That is correct rather
 than an oversight: undo restores a graph the hooks already saw, and a host that

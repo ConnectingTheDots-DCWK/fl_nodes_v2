@@ -155,16 +155,50 @@ void main() {
       );
     });
 
-    test('honours a custom validator', () {
-      final controller = NodeEditorController(
-        graph: NodeGraph(nodes: <GraphNode>[node('a'), node('b')]),
-        connectionValidator: (graph, from, to) => to.nodeId != 'b',
+    test('a validator adds to the default checks, or replaces them', () {
+      List<GraphNode> nodes() => <GraphNode>[
+        node('a'),
+        node('b'),
+        node(
+          'c',
+          ports: const <NodePort>[NodePort.input(id: 'in', maxConnections: 1)],
+        ),
+      ];
+      const out = PortRef('a', 'out');
+      const capped = PortRef('c', 'in');
+
+      final adding = NodeEditorController(
+        graph: NodeGraph(nodes: nodes()),
+        connectionValidator: (check) =>
+            check.allowedByDefault && check.to.nodeId != 'b',
+      );
+      addTearDown(adding.dispose);
+      expect(adding.connect(out, const PortRef('b', 'in')), isNull);
+      expect(adding.connect(out, capped), isNotNull);
+      expect(
+        adding.canConnect(out, capped),
+        isFalse,
+        reason: 'a rule anded in keeps the duplicate and capacity checks',
       );
 
-      expect(
-        controller.connect(const PortRef('a', 'out'), const PortRef('b', 'in')),
-        isNull,
+      ConnectionCheck? seen;
+      final replacing = NodeEditorController(
+        graph: NodeGraph(nodes: nodes()),
+        connectionValidator: (check) {
+          seen = check;
+          return true;
+        },
       );
+      addTearDown(replacing.dispose);
+      expect(replacing.connect(const PortRef('c', 'in'), out), isNotNull);
+      expect(
+        replacing.connect(out, capped),
+        isNotNull,
+        reason: 'ignoring allowedByDefault is replacing it, on purpose',
+      );
+      expect(seen!.allowedByDefault, isFalse);
+      expect(seen!.from, out, reason: 'the pair arrives output first');
+      expect(seen!.fromPort.isOutput && seen!.toPort.isInput, isTrue);
     });
   });
 

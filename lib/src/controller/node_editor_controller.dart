@@ -37,8 +37,53 @@ part 'run_trace.dart';
 part 'selection.dart';
 
 /// Decides whether an output port may be wired to an input port.
-typedef ConnectionValidator =
-    bool Function(NodeGraph graph, PortRef from, PortRef to);
+///
+/// It is asked only about a pair that is already one output and one input,
+/// both present, on two nodes unless self-connections are allowed. What it
+/// answers is final, so a rule that *adds* to the package's own checks ands
+/// them in — `check.allowedByDefault && myRule(check)` — and a validator that
+/// ignores [ConnectionCheck.allowedByDefault] replaces them.
+typedef ConnectionValidator = bool Function(ConnectionCheck check);
+
+/// A wire somebody is about to draw, as a [ConnectionValidator] sees it.
+final class ConnectionCheck {
+  ConnectionCheck._(this.graph, this.from, this.to, this.fromPort, this.toPort);
+
+  /// The graph as it is before the wire.
+  final NodeGraph graph;
+
+  /// The output end.
+  final PortRef from;
+
+  /// The input end.
+  final PortRef to;
+
+  final NodePort fromPort;
+  final NodePort toPort;
+
+  /// What the package answers on its own: not a duplicate, room left on both
+  /// ends under [NodePort.maxConnections], and
+  /// [NodeEditorController.portsCompatible]. Worked out only when read, since
+  /// a validator that replaces the checks never needs it.
+  late final bool allowedByDefault =
+      NodeEditorController.portsCompatible(fromPort, toPort) &&
+      !_isDuplicate &&
+      !_isFull(from) &&
+      !_isFull(to);
+
+  bool get _isDuplicate {
+    for (final existing in graph.connectionsOf(from.nodeId)) {
+      if (existing.from == from && existing.to == to) return true;
+    }
+    return false;
+  }
+
+  bool _isFull(PortRef ref) {
+    final limit = graph.nodes[ref.nodeId]?.portById(ref.portId)?.maxConnections;
+    if (limit == null) return false;
+    return graph.connectionsAt(ref).length >= limit;
+  }
+}
 
 /// Works out where every node should go.
 ///
@@ -866,30 +911,22 @@ class NodeEditorController extends ChangeNotifier {
     final (from, to) = portA.isOutput ? (a, b) : (b, a);
     if (!allowSelfConnections && from.nodeId == to.nodeId) return null;
 
-    final validator = _validator ?? defaultConnectionValidator;
-    if (!validator(_graph, from, to)) return null;
-    return (from, to);
+    final check = ConnectionCheck._(
+      _graph,
+      from,
+      to,
+      portA.isOutput ? portA : portB,
+      portA.isOutput ? portB : portA,
+    );
+    final validator = _validator;
+    final allowed = validator == null
+        ? check.allowedByDefault
+        : validator(check);
+    return allowed ? (from, to) : null;
   }
 
   NodePort? _portOf(PortRef ref) =>
       _graph.nodes[ref.nodeId]?.portById(ref.portId);
-
-  /// Rejects duplicates, respects each port's [NodePort.maxConnections], and
-  /// refuses a pair whose [portsCompatible] says they do not belong together.
-  static bool defaultConnectionValidator(
-    NodeGraph graph,
-    PortRef from,
-    PortRef to,
-  ) {
-    for (final existing in graph.connectionsOf(from.nodeId)) {
-      if (existing.from == from && existing.to == to) return false;
-    }
-    final source = graph.nodes[from.nodeId]?.portById(from.portId);
-    final target = graph.nodes[to.nodeId]?.portById(to.portId);
-    if (source == null || target == null) return false;
-    if (!portsCompatible(source, target)) return false;
-    return !_isPortFull(graph, from) && !_isPortFull(graph, to);
-  }
 
   /// Whether two ports carry the same thing.
   ///
@@ -899,19 +936,12 @@ class NodeEditorController extends ChangeNotifier {
   /// untyped port is a wildcard, which is what keeps a graph written before
   /// types existed entirely legal.
   ///
-  /// Exposed because a host that supplies its own [ConnectionValidator]
-  /// replaces [defaultConnectionValidator] wholesale, and would otherwise lose
-  /// this along with the duplicate and capacity checks.
+  /// Part of [ConnectionCheck.allowedByDefault], and public for a validator
+  /// that replaces the default but still wants this half of it.
   static bool portsCompatible(NodePort from, NodePort to) {
     if (from.kind != to.kind) return false;
     if (from.dataType == null || to.dataType == null) return true;
     return from.dataType == to.dataType;
-  }
-
-  static bool _isPortFull(NodeGraph graph, PortRef ref) {
-    final limit = graph.nodes[ref.nodeId]?.portById(ref.portId)?.maxConnections;
-    if (limit == null) return false;
-    return graph.connectionsAt(ref).length >= limit;
   }
 
   /// Generates ids of the form `prefix_0`, `prefix_1`, ... unique within this
