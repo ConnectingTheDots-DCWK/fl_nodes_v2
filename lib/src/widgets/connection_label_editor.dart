@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/node_editor_localizations.dart';
+
 /// The default editor for a link caption: a small modal with a text field.
 ///
 /// Captions are canvas text rather than widgets, so there is nothing to focus
@@ -9,10 +11,12 @@ import 'package:flutter/material.dart';
 ///
 /// Returns the new caption, or null if the user backed out. An empty result
 /// clears the caption.
+///
+/// [title] defaults to [NodeEditorLocalizations.linkLabelTitle].
 Future<String?> showConnectionLabelEditor(
   BuildContext context, {
   required String? initialValue,
-  String title = 'Link label',
+  String? title,
 }) {
   return showDialog<String>(
     context: context,
@@ -28,7 +32,7 @@ class _ConnectionLabelDialog extends StatefulWidget {
   });
 
   final String? initialValue;
-  final String title;
+  final String? title;
 
   @override
   State<_ConnectionLabelDialog> createState() => _ConnectionLabelDialogState();
@@ -52,16 +56,17 @@ class _ConnectionLabelDialogState extends State<_ConnectionLabelDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final words = NodeEditorLocalizations.of(context);
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(widget.title ?? words.linkLabelTitle),
       content: SizedBox(
         width: 320,
         child: TextField(
           controller: _controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Leave empty to remove the caption',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: words.linkLabelHint,
           ),
           onSubmitted: (_) => _submit(),
         ),
@@ -69,9 +74,9 @@ class _ConnectionLabelDialogState extends State<_ConnectionLabelDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(words.cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Save')),
+        FilledButton(onPressed: _submit, child: Text(words.saveConfirm)),
       ],
     );
   }

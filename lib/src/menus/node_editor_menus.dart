@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../controller/node_editor_controller.dart';
 import '../geometry/connection_path.dart' show RoutePoint;
+import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
 import '../model/node_connection.dart';
 import '../model/node_group.dart';
@@ -76,6 +77,7 @@ class NodeMenuRequest {
     required this.newProject,
     required this.openProject,
     required this.saveProject,
+    this.localizations = const DefaultNodeEditorLocalizations(),
   });
 
   final NodeEditorController controller;
@@ -91,6 +93,11 @@ class NodeMenuRequest {
   final VoidCallback newProject;
   final VoidCallback openProject;
   final VoidCallback saveProject;
+
+  /// The words the default entries are labelled with. The editor fills it
+  /// from [NodeEditorLocalizations.of]; on a request built by hand it is
+  /// English.
+  final NodeEditorLocalizations localizations;
 
   Offset get scenePosition => target.scenePosition;
 }
@@ -165,6 +172,7 @@ class NodeEditorMenus {
   // ------------------------------------------------------------------ node
 
   List<NodeMenuEntry> _nodeEntries(NodeMenuRequest request, GraphNode node) {
+    final words = request.localizations;
     final controller = request.controller;
     final selection = controller.selection;
     final clipboard = controller.clipboard;
@@ -175,46 +183,51 @@ class NodeEditorMenus {
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: 'Cut',
+        id: NodeMenuEntryId.cut,
+        label: words.cut,
         icon: Icons.content_cut,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyX, control: true),
         onSelected: hasSelection ? () => clipboard.cut() : null,
       ),
       NodeMenuEntry(
-        label: 'Copy',
+        id: NodeMenuEntryId.copy,
+        label: words.copy,
         icon: Icons.copy_outlined,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyC, control: true),
         onSelected: hasSelection ? () => clipboard.copy() : null,
       ),
       NodeMenuEntry(
-        label: 'Delete',
+        id: NodeMenuEntryId.delete,
+        label: words.delete,
         icon: Icons.delete_outline,
         shortcut: const SingleActivator(LogicalKeyboardKey.delete),
         onSelected: hasSelection ? selection.deleteSelected : null,
       ),
       const NodeMenuEntry.separator(),
-      // The keystroke is the real path; this is how anyone finds out there is
-      // one. Disabled rather than hidden when the selection cannot be framed,
-      // so the entry teaches the rule instead of vanishing without saying why.
+      // "Group" for a fresh frame, "Add to group" when one is in the
+      // selection — the same command either way, named after what it is about
+      // to do. The keystroke is the real path; this is how anyone finds out
+      // there is one. Disabled rather than hidden when the selection cannot be
+      // framed, so the entry teaches the rule instead of vanishing without
+      // saying why.
       NodeMenuEntry(
-        label: _groupLabel(controller),
+        id: NodeMenuEntryId.group,
+        label: controller.selection.groupIds.isEmpty
+            ? words.group
+            : words.addToGroup,
         icon: Icons.select_all,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyG, control: true),
         onSelected: _canGroup(controller) ? controller.groupSelection : null,
       ),
       if (description != null && description.trim().isNotEmpty)
         NodeMenuEntry(
-          label: 'Description',
+          id: NodeMenuEntryId.description,
+          label: words.description,
           icon: Icons.info_outline,
           onSelected: () => request.describeNode(node, description),
         ),
     ];
   }
-
-  /// "Group" for a fresh frame, "Add to group" when one is in the selection —
-  /// the same command either way, named after what it is about to do.
-  static String _groupLabel(NodeEditorController controller) =>
-      controller.selection.groupIds.isEmpty ? 'Group' : 'Add to group';
 
   /// Mirrors the rules in [NodeEditorController.groupSelection]. Asked here so
   /// the entry can be greyed out rather than doing nothing when chosen.
@@ -237,17 +250,20 @@ class NodeEditorMenus {
   // ----------------------------------------------------------------- group
 
   List<NodeMenuEntry> _groupEntries(NodeMenuRequest request, NodeGroup group) {
+    final words = request.localizations;
     final controller = request.controller;
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: 'Cut',
+        id: NodeMenuEntryId.cut,
+        label: words.cut,
         icon: Icons.content_cut,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyX, control: true),
         onSelected: () => controller.clipboard.cut(),
       ),
       NodeMenuEntry(
-        label: 'Copy',
+        id: NodeMenuEntryId.copy,
+        label: words.copy,
         icon: Icons.copy_outlined,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyC, control: true),
         onSelected: () => controller.clipboard.copy(),
@@ -255,32 +271,38 @@ class NodeEditorMenus {
       // Says what it takes with it. Deleting a frame and leaving the nodes is
       // a different command, and it is the next one down.
       NodeMenuEntry(
-        label: 'Delete with contents',
+        id: NodeMenuEntryId.deleteWithContents,
+        label: words.deleteWithContents,
         icon: Icons.delete_outline,
         shortcut: const SingleActivator(LogicalKeyboardKey.delete),
         onSelected: controller.selection.deleteSelected,
       ),
       NodeMenuEntry(
-        label: 'Disband',
+        id: NodeMenuEntryId.disband,
+        label: words.disband,
         icon: Icons.grid_off_outlined,
         onSelected: () => controller.disbandGroups(<String>[group.id]),
       ),
       const NodeMenuEntry.separator(),
       NodeMenuEntry(
-        label: 'Rename',
+        id: NodeMenuEntryId.rename,
+        label: words.rename,
         icon: Icons.edit_outlined,
         onSelected: () => request.renameGroup(group),
       ),
       NodeMenuEntry(
-        label: 'Colour',
+        id: NodeMenuEntryId.colour,
+        label: words.colour,
         icon: Icons.palette_outlined,
         children: <NodeMenuEntry>[
           NodeMenuEntry(
-            label: 'Neutral',
+            id: NodeMenuEntryId.neutralColour,
+            label: words.neutralColour,
             onSelected: () => controller.setGroupColor(group.id, null),
           ),
           for (final swatch in NodeGroup.palette)
             NodeMenuEntry(
+              id: NodeMenuEntryId.colourSwatch,
               label: '#${swatch.toARGB32().toRadixString(16).substring(2)}',
               onSelected: () => controller.setGroupColor(group.id, swatch),
             ),
@@ -292,6 +314,7 @@ class NodeEditorMenus {
   // ------------------------------------------------------------------ port
 
   List<NodeMenuEntry> _portEntries(NodeMenuRequest request, PortRef port) {
+    final words = request.localizations;
     final controller = request.controller;
     final wires = controller.graph
         .connectionsAt(port)
@@ -300,7 +323,8 @@ class NodeEditorMenus {
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: wires.length == 1 ? 'Cut link' : 'Cut links',
+        id: NodeMenuEntryId.cutLinks,
+        label: words.cutLinks(wires.length),
         icon: Icons.link_off,
         onSelected: wires.isEmpty
             ? null
@@ -316,6 +340,7 @@ class NodeEditorMenus {
     NodeConnection connection,
   ) {
     final controller = request.controller;
+    final words = request.localizations;
 
     void goTo(String nodeId) {
       controller.selection.selectNode(nodeId);
@@ -332,12 +357,14 @@ class NodeEditorMenus {
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: 'Go to source',
+        id: NodeMenuEntryId.goToSource,
+        label: words.goToSource,
         icon: Icons.arrow_back,
         onSelected: loops ? null : () => goTo(connection.from.nodeId),
       ),
       NodeMenuEntry(
-        label: 'Go to destination',
+        id: NodeMenuEntryId.goToDestination,
+        label: words.goToDestination,
         icon: Icons.arrow_forward,
         onSelected: loops ? null : () => goTo(connection.to.nodeId),
       ),
@@ -346,13 +373,15 @@ class NodeEditorMenus {
       // the place clicked. Either way the third line clears the route.
       if (waypoint != null)
         NodeMenuEntry(
-          label: 'Remove waypoint',
+          id: NodeMenuEntryId.removeWaypoint,
+          label: words.removeWaypoint,
           icon: Icons.remove_circle_outline,
           onSelected: () => controller.removeWaypoint(connection.id, waypoint),
         )
       else
         NodeMenuEntry(
-          label: 'Add waypoint here',
+          id: NodeMenuEntryId.addWaypointHere,
+          label: words.addWaypointHere,
           icon: Icons.add_circle_outline,
           onSelected: insertion == null
               ? null
@@ -363,7 +392,8 @@ class NodeEditorMenus {
                 ),
         ),
       NodeMenuEntry(
-        label: 'Clear waypoints',
+        id: NodeMenuEntryId.clearWaypoints,
+        label: words.clearWaypoints,
         icon: Icons.linear_scale,
         onSelected: connection.waypoints.isEmpty
             ? null
@@ -374,7 +404,8 @@ class NodeEditorMenus {
       ),
       const NodeMenuEntry.separator(),
       NodeMenuEntry(
-        label: 'Delete',
+        id: NodeMenuEntryId.deleteLink,
+        label: words.delete,
         icon: Icons.delete_outline,
         onSelected: () => controller.removeConnections(<String>[connection.id]),
       ),
@@ -384,6 +415,7 @@ class NodeEditorMenus {
   // ---------------------------------------------------------------- canvas
 
   List<NodeMenuEntry> _canvasEntries(NodeMenuRequest request) {
+    final words = request.localizations;
     final controller = request.controller;
     final camera = controller.camera;
     final size = request.viewportSize;
@@ -391,14 +423,16 @@ class NodeEditorMenus {
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: 'Center view',
+        id: NodeMenuEntryId.centerView,
+        label: words.centerView,
         icon: Icons.center_focus_weak_outlined,
         onSelected: controller.graph.isEmpty
             ? null
             : () => camera.centerOnContent(size),
       ),
       NodeMenuEntry(
-        label: 'Reset zoom',
+        id: NodeMenuEntryId.resetZoom,
+        label: words.resetZoom,
         icon: Icons.youtube_searched_for,
         // About the middle of the viewport, so whatever the user was looking
         // at is still what they are looking at.
@@ -408,7 +442,8 @@ class NodeEditorMenus {
         ),
       ),
       NodeMenuEntry(
-        label: 'Paste',
+        id: NodeMenuEntryId.paste,
+        label: words.paste,
         icon: Icons.paste_outlined,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyV, control: true),
         onSelected: controller.clipboard.canPaste
@@ -421,12 +456,18 @@ class NodeEditorMenus {
       // Nothing to create is not the same as an empty submenu to open: a host
       // that has named none of its definitions gets no Create at all.
       if (create.isNotEmpty)
-        NodeMenuEntry(label: 'Create', icon: Icons.add, children: create),
+        NodeMenuEntry(
+          id: NodeMenuEntryId.create,
+          label: words.create,
+          icon: Icons.add,
+          children: create,
+        ),
       // Its own entry rather than one more line inside Create, so a host that
       // does not want notes can drop it from `build` with a `where` instead of
       // rebuilding the submenu around it.
       NodeMenuEntry(
-        label: 'Add comment',
+        id: NodeMenuEntryId.addComment,
+        label: words.addComment,
         icon: Icons.sticky_note_2_outlined,
         onSelected: () => controller.selection.selectNode(
           controller.addComment(position: request.scenePosition),
@@ -434,7 +475,8 @@ class NodeEditorMenus {
       ),
       if (showProjectMenu)
         NodeMenuEntry(
-          label: 'Project',
+          id: NodeMenuEntryId.project,
+          label: words.project,
           icon: Icons.folder_outlined,
           children: _projectEntries(request),
         ),
@@ -502,19 +544,22 @@ class NodeEditorMenus {
   }
 
   List<NodeMenuEntry> _projectEntries(NodeMenuRequest request) {
+    final words = request.localizations;
     final controller = request.controller;
     final history = controller.history;
     final project = controller.project;
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
-        label: 'Undo',
+        id: NodeMenuEntryId.undo,
+        label: words.undo,
         icon: Icons.undo,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyZ, control: true),
         onSelected: history.canUndo ? history.undo : null,
       ),
       NodeMenuEntry(
-        label: 'Redo',
+        id: NodeMenuEntryId.redo,
+        label: words.redo,
         icon: Icons.redo,
         shortcut: const SingleActivator(
           LogicalKeyboardKey.keyZ,
@@ -525,17 +570,20 @@ class NodeEditorMenus {
       ),
       const NodeMenuEntry.separator(),
       NodeMenuEntry(
-        label: 'Open',
+        id: NodeMenuEntryId.open,
+        label: words.open,
         icon: Icons.folder_open_outlined,
         onSelected: project.canLoad ? request.openProject : null,
       ),
       NodeMenuEntry(
-        label: 'Save',
+        id: NodeMenuEntryId.save,
+        label: words.save,
         icon: Icons.save_outlined,
         onSelected: project.canSave ? request.saveProject : null,
       ),
       NodeMenuEntry(
-        label: 'New project',
+        id: NodeMenuEntryId.newProject,
+        label: words.newProject,
         icon: Icons.note_add_outlined,
         onSelected: request.newProject,
       ),

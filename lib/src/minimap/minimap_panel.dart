@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../controller/node_editor_controller.dart';
+import '../l10n/node_editor_localizations.dart';
 import '../painting/connection_layout.dart';
 import '../theme/node_editor_theme.dart';
 import 'minimap_config.dart';
@@ -398,7 +399,9 @@ class _MinimapBar extends StatelessWidget {
                 // because an X on an already-folded panel reads as "close",
                 // which is the one thing it does not do.
                 icon: minimap.minimised ? Icons.open_in_full : Icons.close,
-                tooltip: minimap.minimised ? 'Restore' : 'Minimise',
+                tooltip: minimap.minimised
+                    ? NodeEditorLocalizations.of(context).minimapRestore
+                    : NodeEditorLocalizations.of(context).minimapMinimise,
                 color: palette.ink,
                 onPressed: minimap.toggleMinimised,
               ),
@@ -466,20 +469,21 @@ class _MinimapSettingsMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final words = NodeEditorLocalizations.of(context);
     return MenuAnchor(
       onOpen: onOpened,
       onClose: onClosed,
       menuChildren: <Widget>[
         SubmenuButton(
           menuChildren: <Widget>[
-            for (final (label, scale) in MinimapConfig.zoomCapPresets)
+            for (final (_, scale) in MinimapConfig.zoomCapPresets)
               _Choice(
-                label: label,
+                label: words.minimapZoomCapLabel(scale),
                 selected: minimap.maxScale == scale,
                 onPressed: () => minimap.maxScale = scale,
               ),
           ],
-          child: const Text('Zoom cap'),
+          child: Text(words.minimapZoomCap),
         ),
         SubmenuButton(
           menuChildren: <Widget>[
@@ -490,40 +494,40 @@ class _MinimapSettingsMenu extends StatelessWidget {
                 onPressed: () => minimap.size = size,
               ),
           ],
-          child: const Text('Size'),
+          child: Text(words.minimapSize),
         ),
         SubmenuButton(
           menuChildren: <Widget>[
             // Node rects are not offered: they are the map.
             _Choice(
-              label: 'Connections',
+              label: words.minimapConnections,
               selected: minimap.showConnections,
               onPressed: () =>
                   minimap.showConnections = !minimap.showConnections,
             ),
             _Choice(
-              label: 'Group frames',
+              label: words.minimapGroupFrames,
               selected: minimap.showGroups,
               onPressed: () => minimap.showGroups = !minimap.showGroups,
             ),
             _Choice(
-              label: 'Comments',
+              label: words.minimapComments,
               selected: minimap.showComments,
               onPressed: () => minimap.showComments = !minimap.showComments,
             ),
           ],
-          child: const Text('Show'),
+          child: Text(words.minimapShow),
         ),
         SubmenuButton(
           menuChildren: <Widget>[
-            for (final (label, opacity) in MinimapConfig.opacityPresets)
+            for (final (_, opacity) in MinimapConfig.opacityPresets)
               _Choice(
-                label: label,
+                label: words.minimapIdleOpacityLabel(opacity),
                 selected: minimap.idleOpacity == opacity,
                 onPressed: () => minimap.idleOpacity = opacity,
               ),
           ],
-          child: const Text('When idle'),
+          child: Text(words.minimapWhenIdle),
         ),
       ],
       builder: (context, menu, _) => InkWell(

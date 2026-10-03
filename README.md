@@ -27,7 +27,7 @@ cd example && flutter run
 
 ```yaml
 dependencies:
-  fl_nodes_v2: ^1.0.0
+  fl_nodes_v2: ^1.1.0
 ```
 
 ```dart
@@ -417,6 +417,17 @@ NodeEditor(
 );
 ```
 
+Every built-in entry carries a `NodeMenuEntryId`. Match on it, not on the
+label, to keep, drop or relabel one of the defaults: the label is in whatever
+language the host speaks (see *Localisation*), and `copyWith` keeps the id.
+
+```dart
+build: (request, defaults) => <NodeMenuEntry>[
+  for (final entry in defaults)
+    if (entry.id != NodeMenuEntryId.disband) entry,
+],
+```
+
 `contextMenus: null` turns them off. Supplying `onNodeSecondaryTap`,
 `onPortSecondaryTap`, `onConnectionSecondaryTap` or `onCanvasSecondaryTap` takes
 that one target over, so a host with its own menu keeps it and does not get two.
@@ -424,6 +435,53 @@ that one target over, so a host with its own menu keeps it and does not get two.
 `createOnDrop` (off by default) makes a wire dropped on empty canvas offer
 Create ▸ at that point and wire up what it makes, in one undo step. It replaces
 `onConnectionDropped` rather than joining it.
+
+### Localisation
+
+The words the editor draws — its menus, its three dialogs, the minimap's bar
+and gear, an empty comment's hint — come from `NodeEditorLocalizations`, the
+same pattern as Flutter's `MaterialLocalizations`. With no delegate in scope
+it is `DefaultNodeEditorLocalizations`, the English above. To translate it,
+extend the default and hand Flutter a delegate for it, beside your own:
+
+```dart
+class GermanEditorLocalizations extends DefaultNodeEditorLocalizations {
+  const GermanEditorLocalizations();
+
+  @override
+  String get cut => 'Ausschneiden';
+
+  @override
+  String cutLinks(int count) =>
+      count == 1 ? 'Verbindung trennen' : 'Verbindungen trennen';
+}
+
+class GermanEditorDelegate
+    extends LocalizationsDelegate<NodeEditorLocalizations> {
+  const GermanEditorDelegate();
+
+  @override
+  bool isSupported(Locale locale) => locale.languageCode == 'de';
+
+  @override
+  Future<NodeEditorLocalizations> load(Locale locale) =>
+      SynchronousFuture(const GermanEditorLocalizations());
+
+  @override
+  bool shouldReload(GermanEditorDelegate old) => false;
+}
+
+// MaterialApp(localizationsDelegates: [GermanEditorDelegate(), ...], …)
+```
+
+**Extend, don't implement.** A later minor version may add a string; a
+subclass of the default shows it in English until you translate it, where an
+`implements` would stop compiling.
+
+What is *not* in it is yours already: a definition's `label`, `category` and
+`description`, `MinimapConfig.title` and `sizePresets`, and
+`EditableLinkLabel.editorTitle`. `NodeGroup.defaultName` is not a word but a
+value written into documents, so it stays as it is in every locale.
 
 ### Comments
 

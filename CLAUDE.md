@@ -770,6 +770,49 @@ connection selection; adding a third set made it visible, because widening a
 group stopped working. `_apply` copies all three before clearing anything, and
 `controller_test.dart` pins it.
 
+## The words
+
+**What the editor says goes through `NodeEditorLocalizations`**
+(`lib/src/l10n/node_editor_localizations.dart`), Flutter's
+`MaterialLocalizations` pattern: an abstract class,
+`DefaultNodeEditorLocalizations` in English, and `.of(context)` falling back
+to the default when no delegate is in scope — so a bare editor, and every
+test that pumps one, needs nothing.
+
+**Two routes, chosen by whether there is a context.** The menu builders are
+pure and stay so: the words travel on `NodeMenuRequest.localizations`, which
+`_menuRequest` fills, and a request built by hand is English. Everything
+else — the three dialogs, the minimap panel, the comment hint, the group
+handle's colour menu — calls `.of(context)` in its own `build`. That is also
+why the minimap needs nothing in `_MinimapSlot`: `.of` registers a dependency
+on `Localizations`, and a dependent rebuilds when it changes even when the
+slot hands back the identical widget. `localizations_test.dart` *a locale
+switch reaches the minimap past its slot cache* is the pin; passing the words
+in through the slot instead would have needed them in its comparison, and
+forgetting would have been invisible.
+
+The rules:
+
+- **A string the host can already set stays the host's**: a definition's
+  label, category and description, `MinimapConfig.title` and `sizePresets`,
+  `EditableLinkLabel.editorTitle` and `editorTitleFor`'s fallback. Making
+  those nullable to route them here would have been a breaking change, for
+  strings a host could translate already.
+- **`NodeGroup.defaultName` is data, never a word.** Every Ctrl+G writes it
+  into the document and the clipboard; the rename hint quotes it as stored.
+- **Numbers are methods.** `minimapZoomCapLabel(scale)` and
+  `minimapIdleOpacityLabel(opacity)` take the value, so a host formats it in
+  its locale; the English reads the label out of the preset table, which
+  stays the one source. `cutLinks(count)` is a plural for the same reason.
+- **A built-in entry is found by `NodeMenuEntryId`, never by its label**, and
+  `copyWith` keeps it. The Create submenu's entries are the host's
+  definitions and carry none.
+
+A host translates by **extending** the default, never by implementing the
+abstract class: a getter added in a minor version then falls back to English
+instead of breaking the host's build — so every new string lands in
+`DefaultNodeEditorLocalizations` in the same commit.
+
 ## Minimap
 
 A readout, and everything about it follows from that. Nothing in the panel

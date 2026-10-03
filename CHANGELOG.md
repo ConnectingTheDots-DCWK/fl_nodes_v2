@@ -3,6 +3,32 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## 1.1.0
+
+The editor's own words can be translated, and its menus can be read without
+reading English. Additive: a host that changes nothing sees exactly what
+1.0.0 showed, and documents are unchanged.
+
+### Added
+
+- `NodeEditorLocalizations`: the words of the built-in menus, the three
+  dialogs, the minimap's bar and gear, and an empty comment's hint, in the
+  pattern of `MaterialLocalizations`. `NodeEditorLocalizations.of(context)`
+  falls back to `DefaultNodeEditorLocalizations` (English), so nothing has to
+  be set up. Translate by extending the default and listing a delegate for it
+  in `localizationsDelegates`.
+- `DefaultNodeEditorLocalizations.delegate`, the English for every locale.
+- `NodeMenuRequest.localizations` (`const DefaultNodeEditorLocalizations()`),
+  which the editor fills from the context.
+- `NodeMenuEntry.id` (null) and `NodeMenuEntryId`, one per built-in entry; a
+  `build` hook matches on it rather than on a label, and `copyWith` keeps it.
+
+### Changed
+
+- The `title` of `showNodeDescription`, `showGroupNameEditor` and
+  `showConnectionLabelEditor` is now `String?`; null takes the localised
+  title. Callers that pass one are unaffected.
+
 ## 1.0.0
 
 The API is stable from here. **A document saved by 0.5.0 reads unchanged**:
