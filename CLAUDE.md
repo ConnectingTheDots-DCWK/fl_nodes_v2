@@ -1026,3 +1026,17 @@ warning.**
   definition has a corner grip.
 - Groups do not nest, and a node belongs to at most one. Both are enforced in
   `putGroup` rather than left to the caller.
+
+## Releasing
+
+Bump `version` in `pubspec.yaml`, turn `## Unreleased` into `## <version>` in
+the CHANGELOG, merge, then run **Actions → publish** on the default branch. It
+tags `v<version>`, cuts the GitHub release with that CHANGELOG section as its
+notes, and publishes to pub.dev with GitHub's OIDC token, so no credential
+lives anywhere. Pushing a `v*` tag, or creating a release in the UI, only
+publishes. `.github/workflows/publish.yml` says why it dispatches itself on
+the tag, and what pub.dev's admin page must allow for that.
+
+Before a version goes out, check the archive rather than the dry-run: the
+dry-run does not resolve imports, and fl_crashpad 1.0.0 shipped without a file
+its build hook imported.

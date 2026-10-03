@@ -1,0 +1,138 @@
+# Publishing to pub.dev, with GitHub's OIDC token rather than anybody's
+# credentials. Two ways in:
+#
+# - **Run it by hand** (Actions → publish → Run workflow, on the default
+#   branch). With `createRelease` on — the default — it reads the version from
+#   pubspec.yaml, tags that commit `v<version>`, cuts the GitHub release with
+#   the CHANGELOG's section for that version as its notes, and then publishes.
+#   With it off, it only publishes, and must be run on the tag (Use workflow
+#   from → Tags).
+# - **Push a tag, or create a release in the UI** (which pushes its tag), and
+#   it only publishes.
+#
+# pub.dev accepts a token only from a run whose ref is a tag matching the
+# package's pattern, so the release job cannot publish from the branch it ran
+# on. And a tag pushed with GITHUB_TOKEN starts no workflow, so it cannot rely
+# on the push either: it dispatches this workflow again *on the new tag*, with
+# `createRelease` off, and that run publishes. pub.dev therefore needs both
+# boxes ticked under Admin → Automated publishing — "push events" and
+# "workflow_dispatch events" — with the tag pattern `v{{version}}`.
+#
+# The Flutter SDK comes from .fvmrc, the pin the hooks use. setup-dart is there
+# only for the step that turns the OIDC token into pub's credentials; the
+# publish itself runs on Flutter's Dart, because the package's environment
+# names a Flutter version and a standalone Dart cannot satisfy that.
+name: publish
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+  workflow_dispatch:
+    inputs:
+      createRelease:
+        description: >-
+          Tag v<pubspec version> and cut the GitHub release first. Off: only
+          publish, and run it on the tag.
+        type: boolean
+        default: true
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.createRelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the tag and the release
+      actions: write # dispatching the publish run on the tag
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the package's name and version
+        id: package
+        run: |
+          echo "name=$(sed -n 's/^name: *//p' pubspec.yaml)" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -n 's/^version: *//p' pubspec.yaml)" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a version that is already tagged
+        env:
+          TAG: v${{ steps.package.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG already exists. Bump the version in pubspec.yaml, or run this on the tag with createRelease off to publish it."
+            exit 1
+          fi
+
+      # The section under `## <version>`, up to the next heading of that level.
+      # A version with no section is refused: the release would have no notes,
+      # and pub.dev would show a CHANGELOG that never mentions it.
+      - name: Take the release notes from the CHANGELOG
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            $0 == "## " v { f = 1; next }
+            /^## / { if (f) exit }
+            f
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "::error::CHANGELOG.md has no '## $VERSION' section."
+            exit 1
+          fi
+
+      - name: Tag, release, and hand over to the publish run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.package.outputs.name }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VERSION" -m "$NAME $VERSION"
+          git push origin "v$VERSION"
+          prerelease=()
+          case "$VERSION" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "v$VERSION" --verify-tag "${prerelease[@]}" \
+            --title "$NAME $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          gh workflow run publish.yml --ref "v$VERSION" -f createRelease=false
+          echo "Released v$VERSION; the publish run is starting on the tag." >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: github.event_name == 'push' || !inputs.createRelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the OIDC token pub.dev accepts
+    steps:
+      - name: Refuse to run anywhere but a tag
+        if: github.ref_type != 'tag'
+        run: |
+          echo "::error::pub.dev only accepts a publish from a tag. Run this on the tag (Use workflow from → Tags), or turn createRelease on."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Refuse a tag that is not the pubspec's version
+        run: |
+          version="$(sed -n 's/^version: *//p' pubspec.yaml)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag is $GITHUB_REF_NAME but pubspec.yaml says $version."
+            exit 1
+          fi
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Read the pinned Flutter version
+        id: fvm
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter pub publish --dry-run
+      - run: flutter pub publish --force
