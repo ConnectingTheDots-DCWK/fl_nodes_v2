@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
 import '../model/node_connection.dart';
 import '../model/node_graph.dart';
@@ -54,10 +55,22 @@ final class DerivedLinkLabel extends LinkLabel {
 /// Stored in [NodeConnection.label] and never computed. A link with this and
 /// no caption yet still draws a placeholder, so it can be given a first one.
 final class EditableLinkLabel extends LinkLabel {
-  const EditableLinkLabel({this.editorTitle = 'Link label'});
+  /// [editorTitle] is the host's own heading, kept in every locale. Left out,
+  /// the editor says [NodeEditorLocalizations.linkLabelTitle].
+  const EditableLinkLabel({String? editorTitle}) : _editorTitle = editorTitle;
 
-  /// Heading for the editor that opens when the caption is tapped.
-  final String editorTitle;
+  final String? _editorTitle;
+
+  /// Heading for the editor that opens when the caption is tapped: the
+  /// host's, or the English default when it gave none. What the editor
+  /// actually shows is [editorTitleIn] the localizations in scope.
+  String get editorTitle =>
+      editorTitleIn(const DefaultNodeEditorLocalizations());
+
+  /// The heading in [words]: the host's own when it gave one, which no
+  /// locale overrides.
+  String editorTitleIn(NodeEditorLocalizations words) =>
+      _editorTitle ?? words.linkLabelTitle;
 }
 
 /// The rule for one kind of connection, matched against [NodeConnection.type].

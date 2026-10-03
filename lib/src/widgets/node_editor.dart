@@ -772,7 +772,10 @@ class NodeEditorState extends State<NodeEditor>
         : showConnectionLabelEditor(
             context,
             initialValue: connection.label,
-            title: _controller.definitions.editorTitleFor(connection),
+            title: _controller.definitions.editorTitleFor(
+              connection,
+              words: NodeEditorLocalizations.of(context),
+            ),
           );
 
     final result = await pending;

@@ -793,17 +793,36 @@ forgetting would have been invisible.
 
 The rules:
 
-- **A string the host can already set stays the host's**: a definition's
-  label, category and description, `MinimapConfig.title` and `sizePresets`,
-  `EditableLinkLabel.editorTitle` and `editorTitleFor`'s fallback. Making
-  those nullable to route them here would have been a breaking change, for
-  strings a host could translate already.
+- **A definition's label, category and description are the host's** and
+  never pass through here: a definition is built without a context, and the
+  host writes them in whatever language it writes everything else.
+- **A word a host *may* set falls back to the localizations when it sets
+  none** — `MinimapConfig.title` and `sizePresets`, and
+  `EditableLinkLabel.editorTitle`. 1.1.0 called those the host's and left
+  them English, and a host that set nothing had no way to translate them: a
+  config is built without a context, and the default was a literal that
+  could not be told apart from a host's own. So the constructor parameter is
+  nullable and the field private; the **public getter keeps its type and its
+  English**, so code that reads it still compiles, and what is drawn is
+  `titleIn(words)` / `sizePresetsIn(words)` / `editorTitleIn(words)`, chosen
+  at the point of display. Making the getter `String?` instead would have
+  broken every reader. `editorTitleFor` takes the words the way
+  `NodeMenuRequest` does — a parameter with the English as its default —
+  because the registry has no context either. Equality reads the private
+  fields: a config given `'Minimap'` and one given nothing draw different
+  things under a German delegate, and `_MinimapSlot` caches on `==`.
+- **A preset table's labels are lookup keys, not settings.**
+  `zoomCapPresets`, `opacityPresets` and `defaultSizePresets` hold the
+  English, and `minimapZoomCapLabel`, `minimapIdleOpacityLabel` and
+  `minimapSizePresetLabel` find it by value. Only `sizePresets` is the
+  host's to replace, and a replaced list is shown as given.
 - **`NodeGroup.defaultName` is data, never a word.** Every Ctrl+G writes it
   into the document and the clipboard; the rename hint quotes it as stored.
-- **Numbers are methods.** `minimapZoomCapLabel(scale)` and
-  `minimapIdleOpacityLabel(opacity)` take the value, so a host formats it in
-  its locale; the English reads the label out of the preset table, which
-  stays the one source. `cutLinks(count)` is a plural for the same reason.
+- **Numbers are methods.** `minimapZoomCapLabel(scale)`,
+  `minimapIdleOpacityLabel(opacity)` and `minimapSizePresetLabel(size)` take
+  the value, so a host formats it in its locale; the English reads the label
+  out of the preset table, which stays the one source. `cutLinks(count)` is a
+  plural for the same reason.
 - **A built-in entry is found by `NodeMenuEntryId`, never by its label**, and
   `copyWith` keeps it. The Create submenu's entries are the host's
   definitions and carry none.

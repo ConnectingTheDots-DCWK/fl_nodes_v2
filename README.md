@@ -27,7 +27,7 @@ cd example && flutter run
 
 ```yaml
 dependencies:
-  fl_nodes_v2: ^1.1.0
+  fl_nodes_v2: ^1.2.0
 ```
 
 ```dart
@@ -478,10 +478,13 @@ class GermanEditorDelegate
 subclass of the default shows it in English until you translate it, where an
 `implements` would stop compiling.
 
-What is *not* in it is yours already: a definition's `label`, `category` and
-`description`, `MinimapConfig.title` and `sizePresets`, and
-`EditableLinkLabel.editorTitle`. `NodeGroup.defaultName` is not a word but a
-value written into documents, so it stays as it is in every locale.
+A definition's `label`, `category` and `description` are yours, and never
+pass through it. `MinimapConfig.title` and `sizePresets` and
+`EditableLinkLabel.editorTitle` are yours if you set them, and kept in every
+locale; leave them out and they come from the localizations
+(`minimapTitle`, `minimapSizePresetLabel`, `linkLabelTitle`).
+`NodeGroup.defaultName` is not a word but a value written into documents, so
+it stays as it is in every locale.
 
 ### Comments
 

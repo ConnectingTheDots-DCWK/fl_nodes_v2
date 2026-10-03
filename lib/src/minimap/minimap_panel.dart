@@ -377,7 +377,7 @@ class _MinimapBar extends StatelessWidget {
               // against the edge.
               Expanded(
                 child: Text(
-                  config.title,
+                  config.titleIn(NodeEditorLocalizations.of(context)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -487,7 +487,7 @@ class _MinimapSettingsMenu extends StatelessWidget {
         ),
         SubmenuButton(
           menuChildren: <Widget>[
-            for (final (label, size) in config.sizePresets)
+            for (final (label, size) in config.sizePresetsIn(words))
               _Choice(
                 label: label,
                 selected: minimap.size == size,

@@ -3,6 +3,34 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## 1.2.0
+
+The three words a host could set but not translate now fall back to the
+localizations: the minimap's title and Size choices, and the link-label
+dialog's heading. Additive: a host that sets none sees the English it saw in
+1.1.0, and one that sets its own keeps it in every locale.
+
+### Added
+
+- `NodeEditorLocalizations.minimapTitle` (`'Minimap'`) and
+  `minimapSizePresetLabel(size)` (the label from
+  `MinimapConfig.defaultSizePresets`), in `DefaultNodeEditorLocalizations`.
+- `MinimapConfig.titleIn(words)` and `sizePresetsIn(words)`, what the panel
+  draws: the host's own, or the words given.
+- `EditableLinkLabel.editorTitleIn(words)`, and `words`
+  (`const DefaultNodeEditorLocalizations()`) on
+  `NodeDefinitionRegistry.editorTitleFor`.
+
+### Changed
+
+- `MinimapConfig`'s `title` and `sizePresets` and `EditableLinkLabel`'s
+  `editorTitle` are now optional with no default value; left out, they are
+  said in the localizations in scope. Their getters still answer the host's
+  string or the English.
+- A `MinimapConfig` given `title: 'Minimap'` or the default presets
+  explicitly is no longer `==` to one given nothing, since only the second
+  is translated.
+
 ## 1.1.0
 
 The editor's own words can be translated, and its menus can be read without
