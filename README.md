@@ -85,6 +85,20 @@ it) and returns any widget.
 > the one input it cannot compare, so every node rebuilds. Wrap the parts that
 > read controller state, not the editor.
 
+## Used in production
+
+fl_nodes_v2 is the canvas of [Ripple Effect](https://ripplefx.app), a desktop
+application for writing interactive stories as graphs, built with Flutter and
+Rust for Linux, macOS and Windows. Every board an author writes is one editor
+over forty node definitions — passages, choices, conditions, loops, dice, Python
+scripts — and the app leans on most of what this README describes: custom node
+bodies, connection rules, undo and the clipboard, comments, groups, the minimap,
+snapping and localisation. Two more views are built on it read-only: an overview
+of how boards hand the story to each other, and a canvas that traces every route
+between two passages across boards. The [node
+reference](https://docs.ripplefx.app/reference/nodes/) on its documentation site
+is generated from those definitions' descriptions.
+
 ## Building an editor
 The pieces in the order a new editor meets them.
 
