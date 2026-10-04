@@ -180,35 +180,42 @@ class _HandleState extends State<_Handle> {
         child: Material(
           color: color,
           borderRadius: BorderRadius.circular(6),
-          child: SizedBox(
-            height: GroupView.handleHeight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const SizedBox(width: 6),
-                const Icon(Icons.drag_indicator, size: 15, color: _ink),
-                const SizedBox(width: 2),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: GroupView.maxNameWidth,
-                  ),
-                  child: Text(
-                    widget.group.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+          // The handle is drawn in canvas space and zooms with the group it
+          // grips, so its name is laid out at the size the handle was
+          // designed for, whatever the reader's text scale: a scaled name in
+          // a fixed handle is clipped, and zoom already makes it bigger. The
+          // colour menu opens in a route and follows the reader as usual.
+          child: MediaQuery.withNoTextScaling(
+            child: SizedBox(
+              height: GroupView.handleHeight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const SizedBox(width: 6),
+                  const Icon(Icons.drag_indicator, size: 15, color: _ink),
+                  const SizedBox(width: 2),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: GroupView.maxNameWidth,
+                    ),
+                    child: Text(
+                      widget.group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 2),
-                _ColorMenu(
-                  selected: widget.group.color,
-                  onPicked: widget.onColorPicked,
-                ),
-              ],
+                  const SizedBox(width: 2),
+                  _ColorMenu(
+                    selected: widget.group.color,
+                    onPicked: widget.onColorPicked,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -3,6 +3,20 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## 1.2.1
+
+Two pieces of the editor's own chrome survive a large OS text size.
+
+### Fixed
+
+- **A group's name is no longer cut off** when the reader's text scale is
+  above 1.0. The handle zooms with the canvas, so its name is laid out at the
+  handle's own size, the way a node's body is; the colour menu still follows
+  the reader.
+- **The minimap's bar grows with the reader's text scale**, so its title is
+  not cut off either. `MinimapController.barHeight` is still the height at
+  1.0, and a folded panel is the taller bar.
+
 ## 1.2.0
 
 The three words a host could set but not translate now fall back to the

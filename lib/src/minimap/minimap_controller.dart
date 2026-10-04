@@ -39,7 +39,10 @@ class MinimapController extends ChangeNotifier {
   static const double defaultMaxScale = 0.2;
   static const double defaultIdleOpacity = 0.28;
 
-  /// Height of the action bar, which is also the panel's height when folded.
+  /// Height of the action bar at a text scale of 1.0, which is also the
+  /// panel's height when folded. The panel draws the bar taller by however
+  /// much the reader's text scale grows its title, so a large OS text size
+  /// does not cut the title off.
   static const double barHeight = 26;
 
   Offset? _position;
