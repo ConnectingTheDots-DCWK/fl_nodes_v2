@@ -377,6 +377,21 @@ void main() {
     expect(mapFinder, findsOneWidget);
   });
 
+  testWidgets('the bar grows with the reader\'s text scale', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final minimap = MinimapController(minimised: true);
+    addTearDown(minimap.dispose);
+    await tester.pumpWidget(harness(boot(), minimapController: minimap));
+    await tester.pumpAndSettle();
+
+    expect(
+      panelRect(tester).height,
+      MinimapController.barHeight + 12,
+      reason: 'a 12px title at twice the size needs twelve more pixels',
+    );
+  });
+
   testWidgets('the bar buttons sit against the right edge, whatever the '
       'width', (tester) async {
     final minimap = MinimapController()..size = const Size(320, 200);

@@ -726,6 +726,11 @@ every drag, and resolution is explicitly not allowed to move nodes anyway.
   frame cannot disagree with the rects picking already uses.
 - `groupsIn` is asked separately from `nodesIn`: two members either side of the
   screen leave a frame crossing a viewport neither node is in.
+- **The handle's name ignores the reader's text scale.** The handle is drawn
+  in canvas space and zooms with its group, and it is `handleHeight` tall
+  whatever the name says — so a name grown by an OS text size of 2.0 lost its
+  descenders. Zoom is how a handle gets bigger, as it is for a node a host
+  draws; the colour menu opens in a route and follows the reader.
 
 Paint order is in `_buildNodeLayer`: node ids are ranked by their index in the
 culled list, each frame is bucketed under the lowest rank among its members,
@@ -834,7 +839,14 @@ instead of breaking the host's build — so every new string lands in
 
 ## Minimap
 
-A readout, and everything about it follows from that. Nothing in the panel
+A readout, and everything about it follows from that.
+
+**The bar is chrome and grows with the reader's text scale**, unlike the map
+under it. `MinimapController.barHeight` is its height at 1.0; the panel draws
+it taller by however much the scale grows the 12px title, folded or not,
+because a fixed bar cut the title off at 2.0. The map is not text and is not
+touched.
+ Nothing in the panel
 moves the camera, so the drag is free to mean "move the panel" — which is the
 gesture that matters, since a panel you cannot move sits on top of the graph
 you are editing. It also means the minimap never calls the controller, never

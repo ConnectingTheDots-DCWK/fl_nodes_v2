@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
@@ -402,6 +403,31 @@ void main() {
 
       expect(controller.graph.groups, hasLength(1));
       expect(find.text(NodeGroup.defaultName), findsOneWidget);
+    });
+
+    testWidgets('a group\'s name ignores the reader\'s text scale', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final controller = await pump(tester);
+      controller.selection.selectNodes(<String>['a', 'b']);
+      controller.groupSelection();
+      await tester.pumpAndSettle();
+
+      final name = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.text(NodeGroup.defaultName),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(
+        name.textScaler.scale(10),
+        10,
+        reason:
+            'the handle zooms with the canvas, and a scaled name in a fixed '
+            'handle is clipped',
+      );
     });
 
     testWidgets('the handle selects and drags the whole group', (tester) async {

@@ -247,9 +247,7 @@ class MinimapPanelState extends State<MinimapPanel> {
     final palette = MinimapPalette.forCanvas(widget.theme.background);
     final panel = _panelSize();
     final position = _resolvedPosition(panel);
-    final height = minimap.minimised
-        ? MinimapController.barHeight
-        : panel.height;
+    final height = minimap.minimised ? _barHeightOf(context) : panel.height;
 
     widget.onRectChanged(position & Size(panel.width, height));
 
@@ -325,6 +323,18 @@ class MinimapPanelState extends State<MinimapPanel> {
 /// timeout — including the taps meant for the menu. This bar needs neither, so
 /// no tap recogniser ever enters the arena and the gear gets a clean press. Do
 /// not add "double-click the bar to fold it" without reading that story first.
+/// The bar's title size, which the bar's height is measured from.
+const double _titleSize = 12;
+
+/// [MinimapController.barHeight] grown by however much the reader's text
+/// scale grows the title. The bar is chrome over the canvas rather than part
+/// of it — it is not zoomed — so its words follow the reader like any other
+/// control's, and a fixed height would clip them.
+double _barHeightOf(BuildContext context) =>
+    MinimapController.barHeight +
+    MediaQuery.textScalerOf(context).scale(_titleSize) -
+    _titleSize;
+
 class _MinimapBar extends StatelessWidget {
   const _MinimapBar({
     required this.config,
@@ -361,7 +371,7 @@ class _MinimapBar extends StatelessWidget {
         onPanEnd: (_) => onDragEnd(),
         onPanCancel: onDragEnd,
         child: Container(
-          height: MinimapController.barHeight,
+          height: _barHeightOf(context),
           color: palette.bar,
           child: Row(
             children: <Widget>[
@@ -382,7 +392,7 @@ class _MinimapBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: palette.ink,
-                    fontSize: 12,
+                    fontSize: _titleSize,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
