@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
@@ -86,6 +87,8 @@ class _Bracketed extends DefaultNodeEditorLocalizations {
   @override
   String get discardConfirm => '[${super.discardConfirm}]';
   @override
+  String get minimapTitle => '[${super.minimapTitle}]';
+  @override
   String get minimapMinimise => '[${super.minimapMinimise}]';
   @override
   String get minimapRestore => '[${super.minimapRestore}]';
@@ -110,6 +113,9 @@ class _Bracketed extends DefaultNodeEditorLocalizations {
   @override
   String groupNameHint(String defaultName) =>
       '[${super.groupNameHint(defaultName)}]';
+  @override
+  String minimapSizePresetLabel(Size size) =>
+      '[${super.minimapSizePresetLabel(size)}]';
   @override
   String minimapZoomCapLabel(double scale) =>
       '[${super.minimapZoomCapLabel(scale)}]';
@@ -409,5 +415,148 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Mine'), findsOneWidget, reason: 'a title given wins');
     expect(find.text('[Close]'), findsOneWidget);
+  });
+
+  group('the words a host may set fall back to the delegate', () {
+    /// One editable wire and an open minimap, so the three strings are on
+    /// screen in one pump: the bar's title, the Size choices, and the
+    /// link-label dialog's heading. [hosts] passes the host's own for each.
+    Future<void> pumpEditor(
+      WidgetTester tester, {
+      required bool bracketed,
+      required bool hosts,
+    }) async {
+      final controller = NodeEditorController(
+        graph: NodeGraph(
+          nodes: <GraphNode>[
+            node('a', at: const Offset(80, 120)),
+            node('b', at: const Offset(520, 120)),
+          ],
+          connections: <NodeConnection>[
+            const NodeConnection(
+              id: 'c1',
+              from: PortRef('a', 'out'),
+              to: PortRef('b', 'in'),
+              type: 'branch',
+              label: 'High',
+            ),
+          ],
+        ),
+        definitions: NodeDefinitionRegistry(
+          const <NodeDefinition>[],
+          links: <LinkDefinition>[
+            LinkDefinition(
+              type: 'branch',
+              label: hosts
+                  ? const EditableLinkLabel(editorTitle: 'Name this choice')
+                  : const EditableLinkLabel(),
+            ),
+          ],
+        ),
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: bracketed ? const Locale('en', 'GB') : null,
+          supportedLocales: bracketed
+              ? const <Locale>[Locale('en', 'GB')]
+              : const <Locale>[Locale('en', 'US')],
+          localizationsDelegates: bracketed
+              ? const <LocalizationsDelegate<Object>>[_ByCountry()]
+              : null,
+          home: Scaffold(
+            body: NodeEditor(
+              controller: controller,
+              theme: NodeEditorTheme.dark(),
+              minimap: hosts
+                  ? const MinimapConfig(
+                      title: 'Overview',
+                      sizePresets: <(String, Size)>[
+                        ('Tiny', Size(140, 100)),
+                        ('Huge', Size(400, 280)),
+                      ],
+                    )
+                  : const MinimapConfig(),
+              nodeBuilder: (context, graphNode, state) => const SizedBox(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    /// What the three places say, in screen order: bar, Size, dialog.
+    Future<List<String>> read(WidgetTester tester) async {
+      final said = <String>[];
+      final bar = find.descendant(
+        of: find.ancestor(
+          of: find.byIcon(Icons.drag_indicator),
+          matching: find.byType(Row),
+        ),
+        matching: find.byType(Text),
+      );
+      said.add(tester.widget<Text>(bar.first).data!);
+
+      await tester.tap(find.byIcon(Icons.settings));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Size'));
+      await tester.pumpAndSettle();
+      // Only the open submenu's choices are items; the gear's rows are
+      // submenu buttons.
+      said.add(
+        tester
+            .widgetList<MenuItemButton>(find.byType(MenuItemButton))
+            .map((item) => (item.child! as Text).data!)
+            .join('|'),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      final state = tester.state<NodeEditorState>(find.byType(NodeEditor));
+      final controller = tester
+          .widget<NodeEditor>(find.byType(NodeEditor))
+          .controller;
+      final anchor = state.connectionLayout['c1']!.labelAnchor!;
+      await tester.tapAt(controller.camera.viewport.toScreen(anchor));
+      await tester.pumpAndSettle();
+      final dialog = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(Text),
+      );
+      said.add(tester.widget<Text>(dialog.first).data!);
+      return said;
+    }
+
+    testWidgets('a host that sets none hears the delegate', (tester) async {
+      await pumpEditor(tester, bracketed: true, hosts: false);
+      expect(await read(tester), <String>[
+        '[Minimap]',
+        '[Small]|[Medium]|[Large]',
+        '[Link label]',
+      ]);
+    });
+
+    testWidgets('a host that sets its own keeps them in every locale', (
+      tester,
+    ) async {
+      await pumpEditor(tester, bracketed: true, hosts: true);
+      expect(await read(tester), <String>[
+        'Overview',
+        'Tiny|Huge',
+        'Name this choice',
+      ]);
+    });
+
+    testWidgets('with no delegate it is the English it always was', (
+      tester,
+    ) async {
+      await pumpEditor(tester, bracketed: false, hosts: false);
+      expect(await read(tester), <String>[
+        'Minimap',
+        'Small|Medium|Large',
+        'Link label',
+      ]);
+    });
   });
 }

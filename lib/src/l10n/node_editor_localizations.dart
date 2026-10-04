@@ -18,11 +18,14 @@ import '../model/node_group.dart';
 /// then shows it in English until it is translated, where an `implements`
 /// would stop compiling.
 ///
-/// Only what a host cannot already say is here. A node definition's label,
-/// category and description, `MinimapConfig.title` and `sizePresets`, and
-/// `EditableLinkLabel.editorTitle` are the host's own strings; and
-/// [NodeGroup.defaultName] is not a word at all but a value written into
-/// documents, which no locale may change.
+/// A node definition's label, category and description are the host's own
+/// strings and never pass through here. Three strings a host *may* set fall
+/// back to these words when it sets none: `MinimapConfig.title`
+/// ([minimapTitle]), `MinimapConfig.sizePresets` ([minimapSizePresetLabel])
+/// and `EditableLinkLabel.editorTitle` ([linkLabelTitle]) — a host that
+/// passes its own keeps it in every locale. [NodeGroup.defaultName] is not a
+/// word at all but a value written into documents, which no locale may
+/// change.
 abstract class NodeEditorLocalizations {
   const NodeEditorLocalizations();
 
@@ -120,7 +123,8 @@ abstract class NodeEditorLocalizations {
   /// Applies the group-name dialog.
   String get renameConfirm;
 
-  /// The link-label dialog's title when the caller gives none.
+  /// The link-label dialog's title when neither the caller nor the link's
+  /// `EditableLinkLabel.editorTitle` gives one.
   String get linkLabelTitle;
 
   /// The link-label field's hint.
@@ -135,6 +139,9 @@ abstract class NodeEditorLocalizations {
   String get discardConfirm;
 
   // ---------------------------------------------------------- minimap
+
+  /// The word on the action bar, when `MinimapConfig.title` is not set.
+  String get minimapTitle;
 
   /// The fold button's tooltip, open and folded.
   String get minimapMinimise;
@@ -151,8 +158,14 @@ abstract class NodeEditorLocalizations {
   String get minimapGroupFrames;
   String get minimapComments;
 
+  /// One of [MinimapConfig.defaultSizePresets], as a choice in the gear, when
+  /// the host set no `sizePresets` of its own. Keyed on the size, like the two
+  /// below: the preset table's labels are the English and the lookup keys.
+  String minimapSizePresetLabel(Size size);
+
   /// One of [MinimapConfig.zoomCapPresets], as a choice in the gear: a number,
-  /// so a host formats it the way its locale writes a percentage.
+  /// so a host formats it the way its locale writes a percentage. The
+  /// table's labels are lookup keys for the English, not words a host sets.
   String minimapZoomCapLabel(double scale);
 
   /// One of [MinimapConfig.opacityPresets], as a choice in the gear.
@@ -258,6 +271,8 @@ class DefaultNodeEditorLocalizations extends NodeEditorLocalizations {
   String get discardConfirm => 'Discard';
 
   @override
+  String get minimapTitle => 'Minimap';
+  @override
   String get minimapMinimise => 'Minimise';
   @override
   String get minimapRestore => 'Restore';
@@ -277,6 +292,14 @@ class DefaultNodeEditorLocalizations extends NodeEditorLocalizations {
   String get minimapComments => 'Comments';
 
   /// The preset's own label, so the English has one source: the table.
+  @override
+  String minimapSizePresetLabel(Size size) {
+    for (final (label, value) in MinimapConfig.defaultSizePresets) {
+      if (value == size) return label;
+    }
+    return '${size.width.round()} × ${size.height.round()}';
+  }
+
   @override
   String minimapZoomCapLabel(double scale) {
     for (final (label, value) in MinimapConfig.zoomCapPresets) {

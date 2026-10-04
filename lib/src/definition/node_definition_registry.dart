@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
+import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
 import '../model/node_connection.dart';
 import '../model/node_graph.dart';
@@ -140,10 +141,20 @@ class NodeDefinitionRegistry {
     };
   }
 
-  /// Heading for the editor opened by tapping [connection]'s caption.
-  String editorTitleFor(NodeConnection connection) {
+  /// Heading for the editor opened by tapping [connection]'s caption, in
+  /// [words] unless the link's definition gives its own.
+  ///
+  /// [words] defaults to the English, as `NodeMenuRequest.localizations`
+  /// does: this is answered without a context, and the editor passes the
+  /// localizations in scope.
+  String editorTitleFor(
+    NodeConnection connection, {
+    NodeEditorLocalizations words = const DefaultNodeEditorLocalizations(),
+  }) {
     final label = _linksByType[connection.type]?.label;
-    return label is EditableLinkLabel ? label.editorTitle : 'Link label';
+    return label is EditableLinkLabel
+        ? label.editorTitleIn(words)
+        : words.linkLabelTitle;
   }
 
   /// Whether [node] is normalised by a definition at all.
