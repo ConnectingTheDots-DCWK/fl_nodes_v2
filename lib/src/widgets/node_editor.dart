@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FragmentShader;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
@@ -40,6 +41,12 @@ import 'group_name_editor.dart';
 import 'group_view.dart';
 import 'node_editor_scope.dart';
 import 'node_view.dart';
+
+/// Whether a scroll pans the canvas instead of zooming it, in place of
+/// `kIsWeb`, which a test cannot change. Null means "whatever the platform
+/// says".
+@visibleForTesting
+bool? debugWheelPansOverride;
 
 /// What a primary-button drag on empty canvas does.
 ///
@@ -847,27 +854,27 @@ class NodeEditorState extends State<NodeEditor>
   }
 
   // A browser has no pan-zoom events: a trackpad reaches the web as wheel
-  // events, which the engine splits by guesswork. A pinch is a wheel with
-  // ctrlKey set and arrives as a scale signal; a two-finger swipe is a scroll
-  // whose kind is `trackpad` where the guess succeeds, and `mouse` on Firefox,
-  // where it cannot be made. Native desktop sends neither — its trackpad is
-  // the pan-zoom pair below.
+  // events, and a two-finger swipe cannot be told from a mouse wheel. The
+  // engine's `kind == trackpad` guess fails on Firefox, on Linux and on
+  // Windows precision touchpads, which is how 1.2.2 shipped a swipe that
+  // still zoomed. So on the web every scroll pans, as legacy fl_nodes did,
+  // and zoom is a pinch or a modified wheel — both of which the engine
+  // already turns into a scale signal (a pinch *is* a ctrl-wheel). Command,
+  // and control on a Mac where the engine leaves a physical one alone, zoom
+  // a scroll that stayed a scroll. Native desktop keeps the wheel's zoom: its
+  // trackpad is the pan-zoom pair below.
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent && event is! PointerScaleEvent) return;
     // Scrolling over the panel must not zoom the canvas underneath it.
     if (_overMinimap(event.localPosition)) return;
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
       final keyboard = HardwareKeyboard.instance;
+      final zoomModifier = keyboard.isMetaPressed || keyboard.isControlPressed;
       switch (resolved) {
         case PointerScaleEvent(:final scale, :final localPosition):
           _controller.camera.zoomBy(scale, focalScreenPoint: localPosition);
-        // Command held is the zoom modifier a Mac reader expects; control
-        // never gets here, because it turned the wheel into a scale.
-        case PointerScrollEvent(
-              kind: PointerDeviceKind.trackpad,
-              :final scrollDelta,
-            )
-            when !keyboard.isMetaPressed:
+        case PointerScrollEvent(:final scrollDelta)
+            when (debugWheelPansOverride ?? kIsWeb) && !zoomModifier:
           _controller.camera.panBy(-scrollDelta);
         case PointerScrollEvent(:final scrollDelta, :final localPosition):
           if (keyboard.isShiftPressed) {

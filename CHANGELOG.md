@@ -9,8 +9,10 @@ A laptop trackpad works in a browser.
 
 ### Fixed
 
-- **A two-finger swipe pans the canvas on the web** instead of zooming it.
-  Command + swipe still zooms, for a Mac reader who expects it.
+- **On the web, scrolling pans the canvas**: a two-finger swipe, and a mouse
+  wheel with it, since a browser gives no reliable way to tell the two apart.
+  Hold command or control to zoom with a scroll instead. Native desktop is
+  unchanged — the wheel zooms and the trackpad pans.
 - **A pinch zooms the canvas on the web**, about the pointer. It did nothing:
   a browser reports a pinch as a control-wheel, which reaches Flutter as a
   scale signal the canvas did not listen for. Control + mouse wheel on the web
@@ -18,9 +20,6 @@ A laptop trackpad works in a browser.
 - The example's page sets `overscroll-behavior: none`, so a sideways swipe
   pans the demo rather than going back a page. A host serving the editor on
   the web wants the same line in its own `index.html`.
-
-Firefox is the exception: it hides what tells a trackpad from a wheel, so a
-swipe there is read as a mouse wheel and zooms. A pinch works everywhere.
 
 ## 1.2.1
 
