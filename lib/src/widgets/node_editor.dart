@@ -863,9 +863,9 @@ class NodeEditorState extends State<NodeEditor>
 
   // A browser has no pan-zoom events: a trackpad reaches the web as wheel
   // events, and a two-finger swipe cannot be told from a mouse wheel. The
-  // engine's `kind == trackpad` guess fails on Firefox, on Linux and on
-  // Windows precision touchpads, which is how 1.2.2 shipped a swipe that
-  // still zoomed. So on the web every scroll pans, as legacy fl_nodes did,
+  // engine's `kind == trackpad` guess fails on Firefox by design, and a first
+  // cut of this fix that trusted it still zoomed on a swipe on a real laptop.
+  // So on the web every scroll pans, as legacy fl_nodes did,
   // and zoom is a pinch or a modified wheel — both of which the engine
   // already turns into a scale signal (a pinch *is* a ctrl-wheel). Command,
   // and control on a Mac where the engine leaves a physical one alone, zoom

@@ -169,8 +169,8 @@ a wheel with `ctrlKey` — which is what a pinch *is* — becomes a
 `PointerScrollEvent`s. **On the web every scroll pans** (`kIsWeb`, overridable
 in tests through `debugWheelPansOverride`), command or control held zooms, and
 a scale zooms. **Do not go back to the engine's `kind == trackpad`**: it is a
-heuristic over non-standard `wheelDelta` fields, and 1.2.2 first shipped
-trusting it — a swipe on the author's laptop still read as a mouse and zoomed.
+heuristic over non-standard `wheelDelta` fields, and the first cut of this fix
+trusted it — a swipe on the author's laptop still read as a mouse and zoomed.
 Firefox defeats it by design. Legacy fl_nodes reached the same blanket rule
 for the same complaint; the price is that a mouse wheel pans in a browser,
 which is what Figma and Miro do too. Do not scale the pinch by

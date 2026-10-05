@@ -5,7 +5,9 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
 ## 1.2.2
 
-A laptop trackpad works in a browser.
+A hotfix: a laptop trackpad works in a browser, and the editor's own chrome
+survives a large OS text size. No API changes. 1.2.1 was never published; its
+fixes are here.
 
 ### Fixed
 
@@ -20,20 +22,6 @@ A laptop trackpad works in a browser.
 - The example's page sets `overscroll-behavior: none`, so a sideways swipe
   pans the demo rather than going back a page. A host serving the editor on
   the web wants the same line in its own `index.html`.
-
-### Changed
-
-- **A selection rectangle held against the edge scrolls the canvas**, the way
-  a wire, a node or a group already did, and keeps selecting what it reaches.
-  Its starting corner stays where it was in the graph. Off with the rest of
-  the edge scroll, `edgeScroll: null`.
-
-## 1.2.1
-
-Two pieces of the editor's own chrome survive a large OS text size.
-
-### Fixed
-
 - **A group's name is no longer cut off** when the reader's text scale is
   above 1.0. The handle zooms with the canvas, so its name is laid out at the
   handle's own size, the way a node's body is; the colour menu still follows
@@ -41,6 +29,13 @@ Two pieces of the editor's own chrome survive a large OS text size.
 - **The minimap's bar grows with the reader's text scale**, so its title is
   not cut off either. `MinimapController.barHeight` is still the height at
   1.0, and a folded panel is the taller bar.
+
+### Changed
+
+- **A selection rectangle held against the edge scrolls the canvas**, the way
+  a wire, a node or a group already did, and keeps selecting what it reaches.
+  Its starting corner stays where it was in the graph. Off with the rest of
+  the edge scroll, `edgeScroll: null`.
 
 ## 1.2.0
 

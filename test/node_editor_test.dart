@@ -458,8 +458,8 @@ void main() {
   });
 
   // On the web a trackpad sends no pan-zoom events, and its swipe cannot be
-  // told from a mouse wheel: 1.2.2 trusted the engine's `kind` guess and a
-  // swipe still zoomed. Every scroll pans there; the pinch is a scale signal.
+  // told from a mouse wheel: trusting the engine's `kind` guess left a swipe
+  // that still zoomed. Every scroll pans there; the pinch is a scale signal.
   testWidgets('on the web a scroll pans and a pinch zooms', (tester) async {
     debugWheelPansOverride = true;
     addTearDown(() => debugWheelPansOverride = null);
