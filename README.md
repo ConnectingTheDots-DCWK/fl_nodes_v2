@@ -847,8 +847,8 @@ rather than gated.
 | --- | --- |
 | Drag canvas | Sweep a selection rectangle, updating live |
 | Shift / ctrl + drag canvas | Sweep, adding to the current selection |
-| Middle-drag, space + drag, touch drag, trackpad | Pan |
-| Scroll / pinch | Zoom about the pointer |
+| Middle-drag, space + drag, touch drag, trackpad swipe | Pan |
+| Scroll, pinch, ctrl + scroll, cmd + trackpad swipe | Zoom about the pointer |
 | Drag node | Move it — selecting it first is not required |
 | Drag a selected node | Move the whole selection |
 | Drag port → port | Create a connection |
@@ -869,6 +869,11 @@ rather than gated.
 drag pans and shift opts into the rubber band. Navigation is never taken over
 by selection either way: a touch drag always pans, so the rubber band is a
 pointer-device affordance only.
+
+**On the web** a trackpad reaches Flutter as wheel events, which the engine
+tells apart from a mouse wheel by heuristic — on Firefox it cannot, and a swipe
+there zooms like a wheel. Add `html, body { overscroll-behavior: none; }` to
+the host page's `index.html`, or a sideways swipe navigates the browser back.
 
 A click selects, a drag moves. Pressing a node and dragging moves it straight
 away, selecting it on the way. The secondary button never drives a drag — it

@@ -455,6 +455,47 @@ void main() {
     expect(after.dy, closeTo(before.dy, 0.001));
   });
 
+  // On the web a trackpad sends no pan-zoom events: the swipe is a scroll of
+  // kind trackpad and the pinch is a scale signal. Both used to zoom-or-nothing.
+  testWidgets(
+    'a trackpad on the web pans with a swipe and zooms with a pinch',
+    (tester) async {
+      final controller = NodeEditorController(
+        graph: NodeGraph(
+          nodes: <GraphNode>[node('a', position: const Offset(60, 60))],
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(harness(controller));
+
+      const focal = Offset(400, 300);
+      final pointer = TestPointer(1, PointerDeviceKind.trackpad);
+      await tester.sendEventToBinding(pointer.hover(focal));
+      final start = controller.camera.viewport;
+      await tester.sendEventToBinding(pointer.scroll(const Offset(30, 40)));
+      await tester.pump();
+
+      expect(controller.camera.viewport.scale, start.scale);
+      expect(
+        controller.camera.viewport.offset,
+        start.offset - const Offset(30, 40),
+      );
+
+      final before = controller.camera.viewport.toScene(focal);
+      await tester.sendEventToBinding(pointer.scale(1.5));
+      await tester.pump();
+
+      final after = controller.camera.viewport.toScene(focal);
+      expect(
+        controller.camera.viewport.scale,
+        closeTo(start.scale * 1.5, 0.001),
+      );
+      expect(after.dx, closeTo(before.dx, 0.001));
+      expect(after.dy, closeTo(before.dy, 0.001));
+    },
+  );
+
   testWidgets('an unselected node drags immediately, selecting as it goes', (
     tester,
   ) async {

@@ -160,6 +160,25 @@ gated on `_pointerButtons & kSecondaryButton` instead, following the existing
 `kMiddleMouseButton` test. Before that, a right-press over a handle started a
 real wire.
 
+**A trackpad is two different devices depending on where the app runs.**
+Native desktop sends `PointerPanZoom*`, which `_handlePanZoom*` reads. A
+browser has no such event, so on the web a trackpad is wheel events, and the
+engine (`pointer_binding.dart`, `_convertWheelEventToPointerData`) sorts them:
+a wheel with `ctrlKey` — which is what a pinch *is* in Chrome and Safari — is
+a `PointerScaleEvent` with `scale = exp(-deltaY / 200)`, and the rest are
+`PointerScrollEvent`s whose `kind` is `trackpad` when `_isTrackpadEvent`'s
+heuristic says so. `_handlePointerSignal` switches on exactly that: scale
+zooms, a trackpad scroll pans (command held zooms, the Mac habit), and a mouse
+scroll keeps the wheel's zoom. Before 1.2.2 it read only scrolls and zoomed on
+every one, so a swipe zoomed and a pinch did nothing. Legacy fl_nodes solved
+the same complaint with `kIsWeb` and a blanket "on the web, scroll pans"; the
+`kind` check is better because a mouse wheel in Chrome still zooms, and it
+needs no `kIsWeb` because native never sends a scroll of kind trackpad. **The
+known hole is Firefox**, where the heuristic returns false by design and a
+swipe zooms; a pinch still works there. Do not scale the pinch by
+`zoomSensitivity` — the engine's factor is what `InteractiveViewer` uses too,
+and the browser's own zoom feels the same.
+
 A port handle straddles its node's border, so **two different recognisers** see
 the two halves of one dot. Every entry point re-checks `_portAt` first:
 `_handleScaleStart`, `_handleNodeDragStart`, and the secondary-tap path.

@@ -3,6 +3,25 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## 1.2.2
+
+A laptop trackpad works in a browser.
+
+### Fixed
+
+- **A two-finger swipe pans the canvas on the web** instead of zooming it.
+  Command + swipe still zooms, for a Mac reader who expects it.
+- **A pinch zooms the canvas on the web**, about the pointer. It did nothing:
+  a browser reports a pinch as a control-wheel, which reaches Flutter as a
+  scale signal the canvas did not listen for. Control + mouse wheel on the web
+  zooms for the same reason.
+- The example's page sets `overscroll-behavior: none`, so a sideways swipe
+  pans the demo rather than going back a page. A host serving the editor on
+  the web wants the same line in its own `index.html`.
+
+Firefox is the exception: it hides what tells a trackpad from a wheel, so a
+swipe there is read as a mouse wheel and zooms. A pinch works everywhere.
+
 ## 1.2.1
 
 Two pieces of the editor's own chrome survive a large OS text size.

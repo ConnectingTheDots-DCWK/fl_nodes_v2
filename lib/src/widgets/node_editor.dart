@@ -846,18 +846,37 @@ class NodeEditorState extends State<NodeEditor>
     widget.onCanvasTap?.call(scene);
   }
 
+  // A browser has no pan-zoom events: a trackpad reaches the web as wheel
+  // events, which the engine splits by guesswork. A pinch is a wheel with
+  // ctrlKey set and arrives as a scale signal; a two-finger swipe is a scroll
+  // whose kind is `trackpad` where the guess succeeds, and `mouse` on Firefox,
+  // where it cannot be made. Native desktop sends neither — its trackpad is
+  // the pan-zoom pair below.
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent) return;
+    if (event is! PointerScrollEvent && event is! PointerScaleEvent) return;
     // Scrolling over the panel must not zoom the canvas underneath it.
     if (_overMinimap(event.localPosition)) return;
     GestureBinding.instance.pointerSignalResolver.register(event, (resolved) {
-      final scroll = resolved as PointerScrollEvent;
-      if (HardwareKeyboard.instance.isShiftPressed) {
-        _controller.camera.panBy(Offset(-scroll.scrollDelta.dy, 0));
-        return;
+      final keyboard = HardwareKeyboard.instance;
+      switch (resolved) {
+        case PointerScaleEvent(:final scale, :final localPosition):
+          _controller.camera.zoomBy(scale, focalScreenPoint: localPosition);
+        // Command held is the zoom modifier a Mac reader expects; control
+        // never gets here, because it turned the wheel into a scale.
+        case PointerScrollEvent(
+              kind: PointerDeviceKind.trackpad,
+              :final scrollDelta,
+            )
+            when !keyboard.isMetaPressed:
+          _controller.camera.panBy(-scrollDelta);
+        case PointerScrollEvent(:final scrollDelta, :final localPosition):
+          if (keyboard.isShiftPressed) {
+            _controller.camera.panBy(Offset(-scrollDelta.dy, 0));
+            return;
+          }
+          final factor = math.exp(-scrollDelta.dy * widget.zoomSensitivity);
+          _controller.camera.zoomBy(factor, focalScreenPoint: localPosition);
       }
-      final factor = math.exp(-scroll.scrollDelta.dy * widget.zoomSensitivity);
-      _controller.camera.zoomBy(factor, focalScreenPoint: scroll.localPosition);
     });
   }
 

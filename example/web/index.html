@@ -31,6 +31,15 @@
 
   <title>fl_nodes_v2 demo</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    A horizontal two-finger swipe past the edge of the page is the browser's
+    back and forward gesture. Without this, panning the canvas sideways on a
+    trackpad navigates away from the demo.
+  -->
+  <style>
+    html, body { overscroll-behavior: none; }
+  </style>
 </head>
 <body>
   <!--
