@@ -409,6 +409,43 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('a marquee held against the edge scrolls, keeps its anchor and '
+      'selects what it reaches', (tester) async {
+    final controller = await boot(tester);
+    // Empty canvas below and left of `a`, so the press starts a marquee.
+    const anchorScene = Offset(60, 60);
+    final start = screenPoint(tester, controller, anchorScene);
+
+    final gesture = await dragTo(tester, start, nearRightEdge(tester, 10));
+    final offsetBefore = controller.camera.viewport.offset;
+    expect(controller.selection.nodeIds, <String>{'a'});
+
+    // `b` sits 1040 scene units right of `a`; at 600 px/s and 16 ms a frame
+    // that is a hundred-odd frames of pull at full speed.
+    for (
+      var i = 0;
+      i < 200 && !controller.selection.nodeIds.contains('b');
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    expect(controller.camera.viewport.offset.dx, lessThan(offsetBefore.dx));
+    expect(
+      controller.selection.nodeIds,
+      <String>{'a', 'b'},
+      reason:
+          'the anchor stayed at its scene point while the canvas moved, so the '
+          'rectangle grew to take in a node that was off screen at the press',
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    final offsetAtRelease = controller.camera.viewport.offset;
+    await hold(tester, 5);
+    expect(controller.camera.viewport.offset, offsetAtRelease);
+  });
+
   testWidgets('a group dragged by its handle scrolls too', (tester) async {
     final controller = await boot(tester);
     controller.selection.selectNodes(<String>['a']);

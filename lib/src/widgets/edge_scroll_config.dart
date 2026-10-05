@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 /// How the canvas scrolls itself when a drag reaches its edge.
 ///
-/// Holding a wire or a node against the side of the viewport pans the camera
+/// Holding a wire, a node or a selection rectangle against the side of the viewport pans the camera
 /// toward that side, so a target off screen can be reached without letting go
 /// to zoom out first. The pointer never has to move for it: parking it in the
 /// margin keeps the canvas going until it leaves.

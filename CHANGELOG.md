@@ -21,6 +21,13 @@ A laptop trackpad works in a browser.
   pans the demo rather than going back a page. A host serving the editor on
   the web wants the same line in its own `index.html`.
 
+### Changed
+
+- **A selection rectangle held against the edge scrolls the canvas**, the way
+  a wire, a node or a group already did, and keeps selecting what it reaches.
+  Its starting corner stays where it was in the graph. Off with the rest of
+  the edge scroll, `edgeScroll: null`.
+
 ## 1.2.1
 
 Two pieces of the editor's own chrome survive a large OS text size.

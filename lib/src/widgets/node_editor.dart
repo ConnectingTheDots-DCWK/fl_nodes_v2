@@ -193,8 +193,7 @@ class NodeEditor extends StatefulWidget {
   ///
   /// On by default, like [contextMenus]: a wire dragged toward a node that is
   /// off screen has nowhere to go otherwise but a zoom-out first. It follows a
-  /// wire, a node and a group; the marquee and the corner grip are not
-  /// scrolled.
+  /// wire, a node, a group and the marquee; the corner grip is not scrolled.
   final EdgeScrollConfig? edgeScroll;
 
   /// The minimap panel, or null for none.
@@ -666,24 +665,7 @@ class NodeEditorState extends State<NodeEditor>
         return;
       }
 
-      final anchor = _marqueeAnchor;
-      if (anchor == null) return;
-
-      final travel =
-          (details.localFocalPoint - _viewport.toScreen(anchor)).distance;
-      if (_marquee == null && travel < _marqueeSlop) return;
-
-      final rect = Rect.fromPoints(
-        anchor,
-        _viewport.toScene(details.localFocalPoint),
-      );
-      setState(() => _marquee = rect);
-      // Selection follows the rectangle live, the way a desktop file manager
-      // highlights as you sweep, rather than landing only on release.
-      _controller.selection.selectNodes(<String>{
-        ..._marqueeBase,
-        ..._controller.layout.nodeIdsIn(rect),
-      });
+      _dragTo(details.localFocalPoint);
       return;
     }
 
@@ -713,6 +695,7 @@ class NodeEditorState extends State<NodeEditor>
       return;
     }
     // Selection was already applied live; ending only clears the overlay.
+    _stopEdgeScroll();
     setState(() {
       _canvasGesture = _CanvasGesture.none;
       _marquee = null;
@@ -721,10 +704,35 @@ class NodeEditorState extends State<NodeEditor>
     });
   }
 
+  /// Stretches the rectangle from its anchor to [localPosition], or reports
+  /// false while the press is still inside the slop and nothing is drawn.
+  ///
+  /// The anchor is in scene space, so when the edge scroll moves the camera
+  /// the corner the drag began at stays where it was in the graph and the
+  /// rectangle grows to meet the pointer.
+  bool _marqueeTo(Offset localPosition) {
+    final anchor = _marqueeAnchor;
+    if (anchor == null) return false;
+
+    final travel = (localPosition - _viewport.toScreen(anchor)).distance;
+    if (_marquee == null && travel < _marqueeSlop) return false;
+
+    final rect = Rect.fromPoints(anchor, _viewport.toScene(localPosition));
+    setState(() => _marquee = rect);
+    // Selection follows the rectangle live, the way a desktop file manager
+    // highlights as you sweep, rather than landing only on release.
+    _controller.selection.selectNodes(<String>{
+      ..._marqueeBase,
+      ..._controller.layout.nodeIdsIn(rect),
+    });
+    return true;
+  }
+
   /// Drops the rectangle and puts the selection back as it was.
   void _abandonMarquee() {
     if (_canvasGesture != _CanvasGesture.marquee) return;
     final base = _marqueeBase;
+    _stopEdgeScroll();
     setState(() {
       _canvasGesture = _CanvasGesture.pan;
       _marquee = null;
@@ -1061,8 +1069,8 @@ class NodeEditorState extends State<NodeEditor>
   void _handleNodeDragUpdate(Offset globalPosition) =>
       _dragTo(_toLocal(globalPosition));
 
-  /// Carries whichever drag is in progress — a wire, a handle or the
-  /// selection — to [localPosition], and notes where that is for the edge
+  /// Carries whichever drag is in progress — a wire, a handle, the
+  /// selection or the marquee — to [localPosition], and notes where that is for the edge
   /// scroll.
   ///
   /// One funnel for both, because both arrive here twice over: from the
@@ -1082,7 +1090,10 @@ class NodeEditorState extends State<NodeEditor>
         for (final entry in _nodeDragStartPositions.entries)
           entry.key: entry.value + delta,
       });
-    } else {
+    } else if (_canvasGesture != _CanvasGesture.marquee ||
+        !_marqueeTo(localPosition)) {
+      // A marquee still inside its slop is a click so far, and a press near
+      // the edge must not scroll before it has become a drag.
       _stopEdgeScroll();
       return;
     }
