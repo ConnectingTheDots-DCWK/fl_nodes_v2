@@ -16,7 +16,7 @@ stay widgets and text fields, sliders, dropdowns and forms all work inside one.
 Everything *around* the nodes — connections, port handles, the grid, the
 selection overlays — is painted.
 
-**[Try it in the browser](https://williamkaroldicioccio.github.io/fl_nodes_v2/)** —
+**[Try it in the browser](https://connectingthedots-dcwk.github.io/fl_nodes_v2/)** —
 the example below, built for the web from `master` on every push — or run it:
 
 ```sh
@@ -899,7 +899,7 @@ without pumping a widget.
 node built from real Flutter inputs, derived ports, link captions, an inspector
 panel, comments, groups, the minimap, JSON save and load, execution, and stress
 graphs up to 5000 nodes. It is [live on GitHub
-Pages](https://williamkaroldicioccio.github.io/fl_nodes_v2/), rebuilt from
+Pages](https://connectingthedots-dcwk.github.io/fl_nodes_v2/), rebuilt from
 `master` by `.github/workflows/demo.yml`.
 
 ```sh
