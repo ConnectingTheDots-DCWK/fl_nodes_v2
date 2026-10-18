@@ -3,7 +3,13 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
-## Unreleased
+## 1.3.0
+
+Wires that take the colour of what they carry, nodes a graph cannot do
+without, and handles that stay under the card covering them — from four
+issues a host opened. Additive: a host that sets none of the new options
+sees what it saw in 1.2.2, except that overlapping nodes now stack in a
+fixed order and a covered handle is covered.
 
 ### Added
 
