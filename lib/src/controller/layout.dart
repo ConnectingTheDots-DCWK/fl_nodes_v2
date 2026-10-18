@@ -114,16 +114,61 @@ class NodeEditorLayout {
   /// The topmost node containing [scenePoint], matching paint order.
   GraphNode? nodeAt(Offset scenePoint) {
     final raised = _raised;
+    final order = _documentOrder;
     GraphNode? best;
+    var bestRank = -1;
     for (final id in _index.queryPoint(scenePoint)) {
       final node = _controller._graph.nodes[id];
       if (node == null) continue;
-      if (best == null || _rank(node, raised) >= _rank(best, raised)) {
+      final rank = _rank(node, raised, order);
+      if (rank > bestRank) {
         best = node;
+        bestRank = rank;
       }
     }
     return best;
   }
+
+  /// The boxes of the nodes painted over [node] that come within [reach] of
+  /// its box — what its port handles have to be clipped out of.
+  ///
+  /// The ports layer is one painter above every card, so a handle is drawn
+  /// over whatever overlaps it unless something says otherwise; this is what
+  /// says otherwise. Group frames are not in it: a frame sits beneath its
+  /// members and lets presses through. Comments are, being nodes.
+  ///
+  /// Remembered until the graph or the paint order moves, because the layer
+  /// repaints on every pan and the answer does not change with the camera.
+  List<Rect> coversOf(GraphNode node, {required double reach}) {
+    final raised = _raised;
+    if (_coversRevision != _controller._revision ||
+        !identical(_coversRaised, raised) ||
+        _coversReach != reach) {
+      _covers.clear();
+      _coversRevision = _controller._revision;
+      _coversRaised = raised;
+      _coversReach = reach;
+    }
+    return _covers.putIfAbsent(node.id, () {
+      final order = _documentOrder;
+      final own = _rank(node, raised, order);
+      final covers = <Rect>[];
+      for (final id in _index.queryRect(
+        node.rect(sizeOf(node)).inflate(reach),
+      )) {
+        if (id == node.id) continue;
+        final other = _controller._graph.nodes[id];
+        if (other == null || _rank(other, raised, order) < own) continue;
+        if (_index.rectOf(id) case final Rect box) covers.add(box);
+      }
+      return covers.isEmpty ? const <Rect>[] : covers;
+    });
+  }
+
+  final Map<String, List<Rect>> _covers = <String, List<Rect>>{};
+  int _coversRevision = -1;
+  Set<String>? _coversRaised;
+  double _coversReach = -1;
 
   /// Node bounds as the spatial index currently sees them.
   Rect? boundsOf(String nodeId) => _index.rectOf(nodeId);
@@ -166,11 +211,21 @@ class NodeEditorLayout {
     // wire is worse than one plainly not there yet.
     final lifted = _controller.emphasis.lifted;
 
+    // A handle under a card painted over its own is not grabbable through
+    // that card, for the reason it is not drawn there: the press belongs to
+    // the card on top. Asked once, of the point itself, so a covered handle
+    // nearby cannot shadow a visible one farther off.
+    final raised = _raised;
+    final order = _documentOrder;
+    final top = nodeAt(scenePoint);
+    final topRank = top == null ? -1 : _rank(top, raised, order);
+
     final probe = Rect.fromCircle(center: scenePoint, radius: radius);
     for (final id in _index.queryRect(probe)) {
       if (lifted.isNotEmpty && !lifted.contains(id)) continue;
       final node = _controller._graph.nodes[id];
       if (node == null) continue;
+      if (_rank(node, raised, order) < topRank) continue;
       final size = anchorSizeOf(node);
       for (final port in node.ports) {
         final distance =
@@ -221,9 +276,35 @@ class NodeEditorLayout {
     // Asked once rather than inside the comparator: with a group selected the
     // expansion allocates, and a sort would build it O(n log n) times.
     final raised = _raised;
-    nodes.sort((a, b) => _rank(a, raised) - _rank(b, raised));
+    final order = _documentOrder;
+    nodes.sort((a, b) => _rank(a, raised, order) - _rank(b, raised, order));
     return nodes;
   }
+
+  /// Each node's place in the document, the tie-break between two nodes that
+  /// are equally raised: the one added later is drawn, and pressed, on top.
+  ///
+  /// The rank used to be raised-or-not and nothing else, so the order among
+  /// the rest fell to whatever the spatial index returned and an unstable
+  /// sort made of it — and [nodeAt] broke the same ties its own way. A card
+  /// could be drawn over its neighbour and lose a press to it. Covering a
+  /// handle needs the order to be one answer, and so does a click.
+  ///
+  /// The node map keeps insertion order through every edit (`putNodes`
+  /// copies it, and replacing a key keeps its place), so a dragged node keeps
+  /// its rank. Cached on the map's identity.
+  Map<String, int> get _documentOrder {
+    final nodes = _controller._graph.nodes;
+    if (!identical(nodes, _orderSource)) {
+      _orderSource = nodes;
+      var index = 0;
+      _order = <String, int>{for (final id in nodes.keys) id: index++};
+    }
+    return _order;
+  }
+
+  Map<String, GraphNode>? _orderSource;
+  Map<String, int> _order = const <String, int>{};
 
   /// The nodes that float above the rest.
   ///
@@ -250,6 +331,10 @@ class NodeEditorLayout {
     return _controller.selection.nodeIdsWithGroups;
   }
 
-  static int _rank(GraphNode node, Set<String> raised) =>
-      raised.contains(node.id) ? 1 : 0;
+  /// Raised nodes above the rest, and document order within each.
+  static int _rank(
+    GraphNode node,
+    Set<String> raised,
+    Map<String, int> order,
+  ) => (raised.contains(node.id) ? order.length : 0) + (order[node.id] ?? 0);
 }

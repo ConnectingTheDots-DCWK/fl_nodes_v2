@@ -1945,8 +1945,11 @@ class NodeEditorState extends State<NodeEditor>
                 ),
                 _buildNodeLayer(size, viewport, theme, drawn, groups),
                 // Above the nodes: a handle sits on its node's border and has
-                // to read over the card, including over a neighbour that
-                // happens to overlap it.
+                // to read over its own card and over any card beneath it. A
+                // card painted over the node covers its handles too — they
+                // are clipped out of it here and `layout.portAt` will not
+                // pick them through it, or a lower node's dots float over
+                // the card on top and steal its presses (#29).
                 RepaintBoundary(
                   child: IgnorePointer(
                     child: CustomPaint(
@@ -1959,6 +1962,13 @@ class NodeEditorState extends State<NodeEditor>
                         viewport: viewport,
                         theme: theme,
                         revision: _controller.revision,
+                        selectionRevision: _controller.selection.revision,
+                        // As far as a hovered handle grows, so a card that
+                        // only reaches its swollen edge still cuts it.
+                        coversOf: (node) => _controller.layout.coversOf(
+                          node,
+                          reach: theme.portRadius * 1.3,
+                        ),
                         hovered: _hoveredPort,
                         highlighted: _pendingTarget,
                         // Handles draw above the whole node layer, scrim

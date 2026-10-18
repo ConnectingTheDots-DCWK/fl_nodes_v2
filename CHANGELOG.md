@@ -31,6 +31,15 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
 ### Fixed
 
+- **A node's handles stay under a card drawn over it.** They used to be drawn
+  above every card, and a press on the top card where one lay started a wire
+  from the node underneath. They are hidden there now and cannot be grabbed
+  through it; a handle still reads over its own card and over any card
+  beneath it.
+- **Overlapping nodes stack in document order**, the one added later on top,
+  and a click lands on the card that is drawn on top. The order among
+  unselected nodes used to be left to chance, and drawing and clicking could
+  disagree about it. A selected node is still raised above the rest.
 - **pub.dev links the repository and the live demo again.** Both moved to
   `ConnectingTheDots-DCWK`; the demo's old address is a 404, and the old
   repository address no longer verified, so pub.dev showed no repository link.
