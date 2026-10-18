@@ -7,6 +7,15 @@
 #
 #   pre-commit install          once, per clone
 #   pre-commit run --all-files  to sweep the whole tree
+#
+# Every entry starts `env -u GIT_DIR -u GIT_INDEX_FILE`. A commit made from a
+# worktree hands its hook both, and every git a tool runs inherits them:
+# flutter works its own version out with git in its SDK directory, read this
+# repository instead, found no tags and said 0.0.0-unknown, and fvm took that
+# for a broken SDK — deleted it, then pointed this repository's origin at its
+# Flutter mirror and wrote Flutter's sixteen thousand files into the index
+# while reinstalling. `pre-commit run` by hand sets neither, which is why it
+# passed. None of these hooks needs git.
 
 default_language_version:
   python: python3
@@ -32,20 +41,20 @@ repos:
       # failed commit into two.
       - id: dart-format
         name: dart format
-        entry: fvm dart format --output=none --set-exit-if-changed
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE fvm dart format --output=none --set-exit-if-changed
         language: system
         types: [dart]
 
       - id: analyze
         name: analyze
-        entry: fvm flutter analyze
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE fvm flutter analyze
         language: system
         types: [dart]
         pass_filenames: false
 
       - id: test
         name: test
-        entry: fvm flutter test
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE fvm flutter test
         language: system
         types: [dart]
         pass_filenames: false
@@ -56,14 +65,14 @@ repos:
       # Dart change, not just on changes under example/.
       - id: example-analyze
         name: analyze · example
-        entry: bash -c 'cd example && fvm flutter analyze'
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE bash -c 'cd example && fvm flutter analyze'
         language: system
         types: [dart]
         pass_filenames: false
 
       - id: example-test
         name: test · example
-        entry: bash -c 'cd example && fvm flutter test'
+        entry: env -u GIT_DIR -u GIT_INDEX_FILE bash -c 'cd example && fvm flutter test'
         language: system
         types: [dart]
         pass_filenames: false
