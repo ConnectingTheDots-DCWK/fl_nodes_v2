@@ -5,6 +5,16 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
 ## Unreleased
 
+### Added
+
+- **`NodeEditor.connectionAppearance`**: how each wire is drawn — its colour,
+  width and dash — asked at paint time with the connection and the two ports
+  it joins, so a wire can take the colour of the type it carries. Nothing is
+  stored and nothing reaches the history. Returns a `ConnectionAppearance`;
+  any field left null keeps the connection's own colour or the theme's.
+  `ConnectionDash.dashed` and `.dotted` are ready-made patterns. The minimap
+  is unchanged.
+
 ### Fixed
 
 - **pub.dev links the repository and the live demo again.** Both moved to

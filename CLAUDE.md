@@ -410,6 +410,33 @@ canvas with no element behind it, and its hover is already known one layer
 up. It is `IgnorePointer`ed, because a label that could be hovered would
 chase the pointer off the handle that summoned it.
 
+## A wire's look
+
+`NodeEditor.connectionAppearance` is the host deciding how each wire is
+drawn, and it is a resolver for the reason `portTooltip` is a callback: the
+answer is a fact about the host's types, and the first consumer's colours
+are *derived* — a generic port takes the colour of whatever is wired to it,
+refreshed through `revalidate()`. Stored on the connection, every such change
+would be an edit in the history or a `replaceGraph` that clears it. Legacy
+fl_nodes had this as a per-port `linkStyleBuilder`, and v2 forgot it.
+
+- **Curve type is not in it.** `connectionStyle` stays one choice for every
+  wire, because the router, picking and arrows rely on that.
+- **One function decides a stroke**, `connectionStroke`, for
+  `ConnectionsPainter` and for `EmphasisPainter`'s redraw above the scrim, or
+  a lifted wire changes colour as the focus lands on it. Hover, selection and
+  a focus tint still win: a highlight is the editor speaking. A selected wire
+  is drawn at the wider of the host's width and the theme's.
+- **The batch key is the stroke**, `(color, width, dash)`, so a graph that
+  styles nothing is still one path.
+- **Dashes are in scene units and cut once**, `ConnectionGeometry.dashedPath`,
+  memoised on the geometry, which is replaced when the curve moves.
+  Screen-space dashes would be re-cut on every zoom. Below the detail zoom a
+  dashed wire draws solid: the dashes would be a pixel long.
+- **The minimap and the pending wire ignore it.** The minimap is a panorama
+  in one colour, and the pending wire has no far port and already uses its
+  colour to say whether a drop is valid.
+
 ## Link styles
 
 `NodeEditorTheme.connectionStyle` picks `curved` or `orthogonal` for every wire

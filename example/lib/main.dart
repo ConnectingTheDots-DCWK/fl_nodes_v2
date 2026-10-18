@@ -397,6 +397,7 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
       minimap: _showMinimap ? const MinimapConfig() : null,
       minimapController: _minimap,
       onNodeDoubleTap: _renameNode,
+      connectionAppearance: _wireLook,
     );
   }
 
@@ -755,3 +756,14 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
+
+/// Data wires dashed, control wires solid, so the flow reads apart from what
+/// it carries. Top-level rather than a closure in `_buildEditor`: a new
+/// function every build would repaint every wire every build.
+ConnectionAppearance? _wireLook(
+  NodeConnection connection,
+  NodePort from,
+  NodePort to,
+) => from.kind == PortKind.control
+    ? null
+    : const ConnectionAppearance(dash: ConnectionDash.dashed);
