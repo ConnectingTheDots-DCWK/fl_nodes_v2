@@ -10,6 +10,7 @@ import '../geometry/connection_router.dart';
 import '../model/node_connection.dart';
 import '../model/node_port.dart';
 import '../definition/node_definition_registry.dart';
+import 'connection_appearance.dart';
 
 /// Cached geometry for one connection, in scene coordinates.
 class ConnectionGeometry {
@@ -56,6 +57,22 @@ class ConnectionGeometry {
   /// Null for a link that shows none. A captionable link with no caption yet
   /// is also null — the placeholder is the painter's business, not the cache's.
   final String? caption;
+
+  Path? _dashed;
+  ConnectionDash? _dashedWith;
+
+  /// [path] cut into [dash], kept until the pattern changes.
+  ///
+  /// Walking the path's metrics is the cost the arrows avoid by being sampled
+  /// once, and the same reasoning applies: the curve only moves when this
+  /// geometry is replaced, so the cut only has to be made again then.
+  Path dashedPath(ConnectionDash dash) {
+    if (_dashedWith != dash) {
+      _dashed = dash.apply(path);
+      _dashedWith = dash;
+    }
+    return _dashed!;
+  }
 }
 
 /// Filled direction markers for [arrows], in scene units.

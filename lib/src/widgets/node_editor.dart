@@ -18,6 +18,7 @@ import '../model/node_comment.dart';
 import '../model/node_connection.dart';
 import '../model/node_group.dart';
 import '../model/port_ref.dart';
+import '../painting/connection_appearance.dart';
 import '../painting/connection_label.dart';
 import '../painting/connection_layout.dart';
 import '../painting/connections_painter.dart';
@@ -95,6 +96,7 @@ class NodeEditor extends StatefulWidget {
     this.onCanvasSecondaryTap,
     this.onPortSecondaryTap,
     this.portTooltip,
+    this.connectionAppearance,
     this.descriptionBuilder,
     this.onConnectionSecondaryTap,
     this.contextMenus = const NodeEditorMenus(),
@@ -164,6 +166,29 @@ class NodeEditor extends StatefulWidget {
   /// so a host can label the ports worth labelling and leave the obvious ones
   /// alone.
   final String? Function(GraphNode node, NodePort port)? portTooltip;
+
+  /// How each wire is drawn — its colour, width and dash — or null for the
+  /// theme's.
+  ///
+  /// Asked at paint time, so the answer is presentation and never part of the
+  /// document: nothing is stored, nothing reaches the history, and a wire
+  /// takes the colour of a port whose colour moved through
+  /// [NodeEditorController.revalidate] the moment it repaints. The usual use
+  /// is a wire the colour of the type it carries:
+  ///
+  /// ```dart
+  /// connectionAppearance: (connection, from, to) =>
+  ///     ConnectionAppearance(color: from.color),
+  /// ```
+  ///
+  /// A connection's own `color` applies where the answer gives none. Hover,
+  /// selection and a focus still colour a wire the theme's way, and the
+  /// minimap ignores this: it is a panorama, not a second canvas.
+  ///
+  /// It is called for every wire on screen on every repaint, panning
+  /// included, so keep it to a lookup. Pass the same function each build — a
+  /// new closure repaints the wires, though it rebuilds nothing.
+  final ConnectionAppearanceResolver? connectionAppearance;
 
   /// Renders a node's description in the "About this node" dialog, or null to
   /// show it as plain selectable text.
@@ -1904,6 +1929,7 @@ class NodeEditorState extends State<NodeEditor>
                       hoveredWaypoint: _hoveredWaypoint,
                       labelStyle: _labelStyle(),
                       definitions: _controller.definitions,
+                      appearance: widget.connectionAppearance,
                     ),
                     size: size,
                   ),
@@ -2054,6 +2080,8 @@ class NodeEditorState extends State<NodeEditor>
                   scale: viewport.scale,
                   theme: theme,
                   revision: _controller.revision,
+                  graph: _controller.graph,
+                  appearance: widget.connectionAppearance,
                 ),
               ),
             ),

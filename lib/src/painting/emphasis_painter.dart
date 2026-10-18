@@ -4,7 +4,9 @@ import 'package:flutter/rendering.dart';
 
 import '../model/graph_emphasis.dart';
 import '../model/graph_node.dart';
+import '../model/node_graph.dart';
 import '../theme/node_editor_theme.dart';
+import 'connection_appearance.dart';
 import 'connection_label.dart';
 import 'connection_layout.dart';
 import 'connections_painter.dart';
@@ -39,6 +41,8 @@ class EmphasisPainter extends CustomPainter {
     required this.scale,
     required this.theme,
     required this.revision,
+    required this.graph,
+    this.appearance,
   });
 
   final GraphEmphasis emphasis;
@@ -65,6 +69,13 @@ class EmphasisPainter extends CustomPainter {
 
   /// [ConnectionLayout]'s invalidation key.
   final int revision;
+
+  /// What [appearance] reads the ports from.
+  final NodeGraph graph;
+
+  /// [NodeEditor.connectionAppearance], so a lifted wire keeps its look: the
+  /// focus may tint it, and nothing else about it changes.
+  final ConnectionAppearanceResolver? appearance;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -121,16 +132,28 @@ class EmphasisPainter extends CustomPainter {
   void _paintConnections(Canvas canvas, Rect visible) {
     if (emphasis.connections.isEmpty) return;
     final drawDetail = scale >= ConnectionLabel.detailScaleThreshold;
-    final curves = <Color, Path>{};
+    final curves = <ConnectionStroke, Path>{};
     final arrows = <Color, Path>{};
 
     for (final entry in connections.entriesIn(visible)) {
       if (!emphasis.connections.containsKey(entry.key)) continue;
-      final color =
-          emphasis.connections[entry.key] ??
-          entry.value.connection.color ??
-          theme.connectionColor;
-      (curves[color] ??= Path()).addPath(entry.value.path, Offset.zero);
+      final own = connectionStroke(
+        entry.value.connection,
+        graph,
+        theme,
+        appearance,
+      );
+      final color = emphasis.connections[entry.key] ?? own.color;
+      final stroke = (
+        color: color,
+        width: math.max(own.width, theme.selectedConnectionWidth),
+        dash: drawDetail ? own.dash : null,
+      );
+      final dash = stroke.dash;
+      (curves[stroke] ??= Path()).addPath(
+        dash == null ? entry.value.path : entry.value.dashedPath(dash),
+        Offset.zero,
+      );
       if (drawDetail) {
         (arrows[color] ??= Path()).addPath(
           arrowheadsPath(entry.value.arrows, arrowheadSize(scale)),
@@ -139,8 +162,8 @@ class EmphasisPainter extends CustomPainter {
       }
     }
 
-    curves.forEach((color, path) {
-      canvas.drawPath(path, _strokePaint(color, theme.selectedConnectionWidth));
+    curves.forEach((stroke, path) {
+      canvas.drawPath(path, _strokePaint(stroke.color, stroke.width));
     });
     arrows.forEach((color, path) {
       canvas.drawPath(path, Paint()..color = color);
@@ -167,5 +190,6 @@ class EmphasisPainter extends CustomPainter {
       oldDelegate.revision != revision ||
       oldDelegate.origin != origin ||
       oldDelegate.scale != scale ||
-      oldDelegate.theme != theme;
+      oldDelegate.theme != theme ||
+      !identical(oldDelegate.appearance, appearance);
 }

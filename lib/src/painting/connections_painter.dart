@@ -7,6 +7,7 @@ import '../model/node_connection.dart';
 import '../model/node_graph.dart';
 import '../definition/node_definition_registry.dart';
 import '../theme/node_editor_theme.dart';
+import 'connection_appearance.dart';
 import 'connection_label.dart';
 import 'connection_layout.dart';
 
@@ -14,9 +15,10 @@ import 'connection_layout.dart';
 ///
 /// Two things keep this cheap on a dense graph. Paths come from
 /// [ConnectionLayout], so nothing is recomputed while panning. And curves
-/// sharing a colour are merged into one [Path] and stroked in a single call,
-/// rather than paying per-connection draw overhead — stroking a path with many
-/// subpaths gives the same result as stroking each on its own.
+/// sharing a stroke — a colour, a width and a dash pattern — are merged into
+/// one [Path] and stroked in a single call, rather than paying per-connection
+/// draw overhead: stroking a path with many subpaths gives the same result as
+/// stroking each on its own. A graph that styles nothing is one batch.
 class ConnectionsPainter extends CustomPainter {
   const ConnectionsPainter({
     required this.layout,
@@ -30,6 +32,7 @@ class ConnectionsPainter extends CustomPainter {
     this.hoveredWaypoint,
     this.labelStyle,
     this.definitions,
+    this.appearance,
   });
 
   final ConnectionLayout layout;
@@ -56,6 +59,9 @@ class ConnectionsPainter extends CustomPainter {
   /// draw something to aim at.
   final NodeDefinitionRegistry? definitions;
 
+  /// [NodeEditor.connectionAppearance], asked for every wire on screen.
+  final ConnectionAppearanceResolver? appearance;
+
   /// Below this zoom, arrowheads and labels stop being readable and are
   /// skipped along with their layout cost.
   static const double _detailScaleThreshold =
@@ -68,7 +74,7 @@ class ConnectionsPainter extends CustomPainter {
 
     // Curves painted in scene space under the viewport transform; stroke
     // widths are divided by the scale so they stay constant on screen.
-    final normal = <Color, Path>{};
+    final normal = <ConnectionStroke, Path>{};
     final arrows = <Color, Path>{};
     final highlighted = <_Layer>[];
 
@@ -77,18 +83,23 @@ class ConnectionsPainter extends CustomPainter {
       final connection = graph.connections[entry.key];
       if (connection == null) continue;
 
+      final stroke = connectionStroke(connection, graph, theme, appearance);
       final priority = _priority(entry.key);
       if (priority == 0) {
-        final color = connection.color ?? theme.connectionColor;
-        (normal[color] ??= Path()).addPath(geometry.path, Offset.zero);
+        (normal[stroke] ??= Path()).addPath(
+          _pathOf(geometry, stroke, drawDetail),
+          Offset.zero,
+        );
         if (drawDetail) {
-          (arrows[color] ??= Path()).addPath(
+          (arrows[stroke.color] ??= Path()).addPath(
             _arrowheads(geometry, connection),
             Offset.zero,
           );
         }
       } else {
-        highlighted.add(_Layer(priority, entry.key, geometry, connection));
+        highlighted.add(
+          _Layer(priority, entry.key, geometry, connection, stroke),
+        );
       }
     }
 
@@ -96,8 +107,8 @@ class ConnectionsPainter extends CustomPainter {
       ..save()
       ..transform(viewport.toMatrix4().storage);
 
-    normal.forEach((color, path) {
-      canvas.drawPath(path, _strokePaint(color, theme.connectionWidth));
+    normal.forEach((stroke, path) {
+      canvas.drawPath(path, _strokePaint(stroke.color, stroke.width));
     });
     arrows.forEach((color, path) {
       canvas.drawPath(path, Paint()..color = color);
@@ -109,10 +120,14 @@ class ConnectionsPainter extends CustomPainter {
       final color = layer.priority == 2
           ? theme.selectedConnectionColor
           : theme.hoveredConnectionColor;
+      // A selected wire is never drawn thinner than the host made it.
       final width = layer.priority == 2
-          ? theme.selectedConnectionWidth
-          : theme.connectionWidth;
-      canvas.drawPath(layer.geometry.path, _strokePaint(color, width));
+          ? math.max(layer.stroke.width, theme.selectedConnectionWidth)
+          : layer.stroke.width;
+      canvas.drawPath(
+        _pathOf(layer.geometry, layer.stroke, drawDetail),
+        _strokePaint(color, width),
+      );
       if (drawDetail) {
         canvas.drawPath(
           _arrowheads(layer.geometry, layer.connection),
@@ -146,7 +161,7 @@ class ConnectionsPainter extends CustomPainter {
       final wireColor = switch (priority) {
         2 => theme.selectedConnectionColor,
         1 => theme.hoveredConnectionColor,
-        _ => connection.color ?? theme.connectionColor,
+        _ => connectionStroke(connection, graph, theme, appearance).color,
       };
       for (final (index, point) in connection.waypoints.indexed) {
         if (!visible.contains(point)) continue;
@@ -173,6 +188,19 @@ class ConnectionsPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5 / viewport.scale,
     );
+  }
+
+  /// The curve as [stroke] draws it: cut into dashes from the cache, or whole
+  /// below the detail zoom, where a dash would be a pixel long.
+  static Path _pathOf(
+    ConnectionGeometry geometry,
+    ConnectionStroke stroke,
+    bool drawDetail,
+  ) {
+    final dash = stroke.dash;
+    return dash == null || !drawDetail
+        ? geometry.path
+        : geometry.dashedPath(dash);
   }
 
   int _priority(String id) {
@@ -251,14 +279,22 @@ class ConnectionsPainter extends CustomPainter {
       oldDelegate.hoveredId != hoveredId ||
       oldDelegate.hoveredWaypoint != hoveredWaypoint ||
       oldDelegate.selectionRevision != selectionRevision ||
-      !identical(oldDelegate.definitions, definitions);
+      !identical(oldDelegate.definitions, definitions) ||
+      !identical(oldDelegate.appearance, appearance);
 }
 
 class _Layer {
-  const _Layer(this.priority, this.id, this.geometry, this.connection);
+  const _Layer(
+    this.priority,
+    this.id,
+    this.geometry,
+    this.connection,
+    this.stroke,
+  );
 
   final int priority;
   final String id;
   final ConnectionGeometry geometry;
   final NodeConnection connection;
+  final ConnectionStroke stroke;
 }
