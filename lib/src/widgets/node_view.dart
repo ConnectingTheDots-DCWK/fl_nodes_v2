@@ -8,6 +8,23 @@ import '../theme/node_editor_theme.dart';
 import 'corner_grip.dart';
 import 'node_box.dart';
 
+/// Every device but a trackpad, for the recognisers that drag things on the
+/// canvas.
+///
+/// A two-finger swipe arrives as `PointerPanZoom*`, and a drag recogniser
+/// takes those as a drag of whatever is under the cursor — so a swipe over a
+/// card moved the card while the canvas panned, and over a handle pulled a
+/// wire out of it. A trackpad's swipe and pinch are the camera's alone
+/// (`NodeEditorState._handlePanZoom*`); its press is reported as a mouse, so
+/// a click or a click-and-drag on the pad still reaches these.
+const Set<PointerDeviceKind> canvasDragDevices = <PointerDeviceKind>{
+  PointerDeviceKind.mouse,
+  PointerDeviceKind.touch,
+  PointerDeviceKind.stylus,
+  PointerDeviceKind.invertedStylus,
+  PointerDeviceKind.unknown,
+};
+
 /// Interaction state handed to the host's node builder.
 @immutable
 class NodeRenderState {
@@ -306,6 +323,7 @@ class _NodeViewState extends State<NodeView> {
         // point stays pinned under the cursor instead of trailing it by the
         // touch slop.
         dragStartBehavior: DragStartBehavior.down,
+        supportedDevices: canvasDragDevices,
         onTap: _handleTap,
         onSecondaryTapUp: widget.onSecondaryTap == null
             ? null

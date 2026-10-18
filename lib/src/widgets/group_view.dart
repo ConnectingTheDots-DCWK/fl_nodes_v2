@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../l10n/node_editor_localizations.dart';
 import '../model/node_group.dart';
 import '../theme/node_editor_theme.dart';
+import 'node_view.dart' show canvasDragDevices;
 
 /// One group: a translucent frame around its members, and the handle that
 /// stands for it.
@@ -167,6 +168,7 @@ class _HandleState extends State<_Handle> {
         // From where the pointer went down, so the grip stays under the
         // cursor rather than trailing it by the touch slop.
         dragStartBehavior: DragStartBehavior.down,
+        supportedDevices: canvasDragDevices,
         onTap: _handleTap,
         onSecondaryTapUp: (details) =>
             widget.onSecondaryTap(details.globalPosition),

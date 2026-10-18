@@ -213,6 +213,19 @@ blocks a `details.kind == trackpad` gesture. The zoom is pinned at
 `localPosition + localPan`: `localPosition` on an update is where the gesture
 began, not where the fingers are.
 
+**Every drag recogniser over the canvas leaves the trackpad out**:
+`supportedDevices: canvasDragDevices` on the node, the group handle, the
+minimap bar and its grip. Unlike the scale recogniser, a drag recogniser
+*does* honour that set for pan-zoom, and without it a swipe begun over one of
+them was a drag of it. A swipe moves the drag's pointer and the camera
+together, so the card only got selected and a wire from a handle stuck to the
+scene a few pixels off, but a Windows pinch's `pan` carries the zoom's shift
+and threw the card. **Windows hit-tests a pan-zoom at the cursor, not the
+fingers**, so it is where the cursor rests that decides what a gesture lands
+on, and a test has to put it there. A press on the pad still arrives as
+`kind: mouse`, so a click and a click-drag reach all four. A new drag surface
+on the canvas takes the same set.
+
 **Windows sends the same event meaning something else**, and
 `_applyDirectManipulation` is the branch for it — read in the engine,
 `shell/platform/windows/direct_manipulation.cc` and `flutter_windows_view.cc`.

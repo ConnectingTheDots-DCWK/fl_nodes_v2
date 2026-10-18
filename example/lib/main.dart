@@ -391,7 +391,8 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
       final vp = _controller.camera.viewport;
       debugPrint(
         '${e.timeStamp.inMilliseconds} ${e.runtimeType} kind=${e.kind.name} '
-        'buttons=${e.buttons} pos=${o(e.position)} $extra'
+        'buttons=${e.buttons} pos=${o(e.position)} '
+        'local=${o(e.localPosition)} $extra'
         ' | camera ${o(vp.offset)} x${vp.scale.toStringAsFixed(3)}',
       );
     }
@@ -405,7 +406,8 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
         PointerScaleEvent(:final scale) => 'scale=$scale',
         _ => '',
       }),
-      onPointerPanZoomStart: (e) => log(e, ''),
+      onPointerPanZoomStart: (e) =>
+          log(e, 'dpr=${View.of(context).devicePixelRatio}'),
       onPointerPanZoomUpdate: (e) => log(
         e,
         'pan=${o(e.pan)} panDelta=${o(e.panDelta)} '

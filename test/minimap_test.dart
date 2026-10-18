@@ -454,6 +454,36 @@ void main() {
     );
   });
 
+  // The bar's pan recogniser would take a trackpad's pan-zoom as a drag, and
+  // the editor's guard keeps the camera still over the panel — so a swipe
+  // that began on the bar carried the panel off under the fingers.
+  testWidgets('a trackpad swipe over the bar moves neither panel nor camera', (
+    tester,
+  ) async {
+    final controller = boot();
+    final minimap = MinimapController();
+    addTearDown(minimap.dispose);
+    await tester.pumpWidget(harness(controller, minimapController: minimap));
+
+    final before = controller.camera.viewport;
+    final start = panelRect(tester).topLeft;
+    final at = tester.getCenter(find.byIcon(Icons.drag_indicator));
+    final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+    await tester.sendEventToBinding(trackpad.panZoomStart(at));
+    await tester.pump();
+    for (var i = 1; i <= 10; i++) {
+      await tester.sendEventToBinding(
+        trackpad.panZoomUpdate(at, pan: Offset(-10.0 * i, -6.0 * i)),
+      );
+      await tester.pump();
+    }
+    await tester.sendEventToBinding(trackpad.panZoomEnd());
+    await tester.pumpAndSettle();
+
+    expect(panelRect(tester).topLeft, start);
+    expect(controller.camera.viewport, before);
+  });
+
   testWidgets('a drag across the map body moves nothing at all', (
     tester,
   ) async {

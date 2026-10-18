@@ -13,6 +13,10 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   dragged a wire out of it.
 - **A pinch on Windows zooms about the fingers.** It zoomed about the mouse
   cursor and threw the view sideways by hundreds of pixels on a wide window.
+- **A trackpad over a node, a handle, a group or the minimap only moves the
+  canvas.** With the cursor resting on one, a swipe or pinch also selected
+  or dragged the node, pulled a wire out of the handle, or carried the panel
+  away.
 
 ## 1.3.0
 
