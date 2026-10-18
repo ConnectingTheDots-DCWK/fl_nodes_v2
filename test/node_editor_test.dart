@@ -496,6 +496,88 @@ void main() {
     expect(after.dy, closeTo(before.dy, 0.001));
   });
 
+  // Native desktop sends a trackpad as pan-zoom, which the canvas's
+  // `Listener` reads — and the scale recogniser accepts too. Acting on both
+  // panned twice, and the recogniser took the last mouse press as where the
+  // swipe began: a swipe after clicking a handle dragged a wire out of it.
+  testWidgets('a trackpad swipe pans once and never starts a wire', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(
+      graph: NodeGraph(
+        nodes: <GraphNode>[
+          node('a', position: const Offset(60, 60)),
+          node('b', position: const Offset(400, 300)),
+        ],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    final mouse = await tester.startGesture(
+      portPoint(tester, controller, 'a', 'out'),
+      kind: PointerDeviceKind.mouse,
+    );
+    await mouse.up();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Begun on `b`'s input, on the half of the handle outside its card where
+    // the canvas recogniser hears it: a wire dragged from the stale press
+    // would be dropped there, since the camera moves under it by the same pan.
+    final at = portPoint(tester, controller, 'b', 'in') - const Offset(3, 0);
+    final start = controller.camera.viewport;
+    final trackpad = TestPointer(2, PointerDeviceKind.trackpad);
+    await tester.sendEventToBinding(trackpad.panZoomStart(at));
+    await tester.pump();
+    for (var i = 1; i <= 5; i++) {
+      await tester.sendEventToBinding(
+        trackpad.panZoomUpdate(at, pan: Offset(10.0 * i, 0)),
+      );
+      await tester.pump();
+    }
+    await tester.sendEventToBinding(trackpad.panZoomEnd());
+    await tester.pump();
+
+    expect(
+      controller.camera.viewport.offset,
+      start.offset + const Offset(50, 0),
+    );
+    expect(controller.graph.connections, isEmpty);
+  });
+
+  testWidgets('a trackpad pinch keeps what is under the fingers there', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(graph: NodeGraph());
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    const at = Offset(400, 300);
+    final under = controller.camera.viewport.toScene(at);
+    final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+    await tester.sendEventToBinding(trackpad.panZoomStart(at));
+    await tester.pump();
+    // Fingers never pinch in place: the centroid drifts as they spread.
+    for (var i = 1; i <= 10; i++) {
+      await tester.sendEventToBinding(
+        trackpad.panZoomUpdate(
+          at,
+          pan: Offset(3.0 * i, 2.0 * i),
+          scale: 1 + 0.08 * i,
+        ),
+      );
+      await tester.pump();
+    }
+
+    final now = controller.camera.viewport.toScene(at + const Offset(30, 20));
+    expect(controller.camera.viewport.scale, closeTo(1.8, 0.001));
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+    await tester.sendEventToBinding(trackpad.panZoomEnd());
+  });
+
   testWidgets('an unselected node drags immediately, selecting as it goes', (
     tester,
   ) async {

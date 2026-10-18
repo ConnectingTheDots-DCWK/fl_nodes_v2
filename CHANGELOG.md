@@ -3,6 +3,15 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## Unreleased
+
+### Fixed
+
+- **A trackpad pans and zooms the canvas once** on native desktop. A
+  two-finger swipe moved the canvas twice as far as the fingers, a pinch let
+  the board slide out from under them, and a swipe after clicking a handle
+  dragged a wire out of it.
+
 ## 1.3.0
 
 Wires that take the colour of what they carry, nodes a graph cannot do

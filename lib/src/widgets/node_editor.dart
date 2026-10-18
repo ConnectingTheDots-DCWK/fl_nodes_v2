@@ -609,6 +609,15 @@ class NodeEditorState extends State<NodeEditor>
   bool get _secondaryPressed => _pointerButtons & kSecondaryButton != 0;
 
   void _handleScaleStart(ScaleStartDetails details) {
+    // A trackpad's pan-zoom is the `Listener`'s alone (`_handlePanZoom*`).
+    // The scale recogniser accepts it too, whatever `supportedDevices` says,
+    // and acting on it here panned the camera twice and read the last mouse
+    // press as where the gesture began — a swipe after a click on a handle
+    // dragged a wire out of it.
+    if (details.kind == PointerDeviceKind.trackpad) {
+      _canvasGesture = _CanvasGesture.blocked;
+      return;
+    }
     if (_secondaryPressed) {
       _canvasGesture = _CanvasGesture.blocked;
       return;
@@ -928,12 +937,14 @@ class NodeEditorState extends State<NodeEditor>
 
   void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
     if (_overMinimap(event.localPosition)) return;
-    _controller.camera.panBy(event.pan - _panZoomLastPan);
-    _panZoomLastPan = event.pan;
+    _controller.camera.panBy(event.localPan - _panZoomLastPan);
+    _panZoomLastPan = event.localPan;
     if (event.scale != 1.0) {
+      // `localPosition` is where the gesture began; the fingers are `localPan`
+      // on from it, and what is under them is what has to stay there.
       _controller.camera.setScale(
         _panZoomStartScale * event.scale,
-        focalScreenPoint: event.localPosition,
+        focalScreenPoint: event.localPosition + event.localPan,
       );
     }
   }

@@ -203,7 +203,15 @@ gated on `_pointerButtons & kSecondaryButton` instead, following the existing
 real wire.
 
 **A trackpad is two different devices depending on where the app runs.**
-Native desktop sends `PointerPanZoom*`, which `_handlePanZoom*` reads. A
+Native desktop sends `PointerPanZoom*`, which `_handlePanZoom*` reads — and
+**only** they: `ScaleGestureRecognizer` accepts pan-zoom whatever
+`supportedDevices` says (it overrides `isPointerPanZoomAllowed` to `true`), so
+the canvas recogniser heard every swipe as well. That panned twice, and since
+`_handleScaleStart` reads `_pointerDownPosition` — the last *mouse* press — a
+swipe after a click on a handle dragged a wire out of it. `_handleScaleStart`
+blocks a `details.kind == trackpad` gesture. The zoom is pinned at
+`localPosition + localPan`: `localPosition` on an update is where the gesture
+began, not where the fingers are. A
 browser has no such event, so on the web a trackpad is wheel events, and the
 engine (`pointer_binding.dart`, `_convertWheelEventToPointerData`) sorts them:
 a wheel with `ctrlKey` — which is what a pinch *is* — becomes a
