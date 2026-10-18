@@ -249,6 +249,38 @@ bracket the drag in one history transaction, pull the dragged *edge* onto the
 grid (see *Snapping*), clamp to `resizeFloor`/`maxWidth`/`maxHeight` and clear
 the floor when the drag comes back to the natural height. `node_resize_test.dart`.
 
+## Nodes a user may not delete or copy
+
+`NodeDefinition.deletable` and `copyable` are on the **definition**, not the
+node, and that is the decision to keep. `resizable` set the precedent: what a
+kind of node allows is a fact about the kind. The other reason is the codec.
+It always writes a value that has a default, so two more flags on `GraphNode`
+would have added two keys to every node of every document the next time it
+was saved, including every board in `ripple_effect`.
+
+They govern **the user's verbs**, the way `draggable` governs the pointer and
+not `applyLayout`. `selection.deleteSelected` and the clipboard check them,
+and the host's `removeNodes` does not. Every keyboard and menu path goes
+through those two, so neither shortcut table has a case of its own.
+
+- **Cut removes only what it copied**, and only if that may also be deleted.
+  A node that never reached the clipboard and was cut anyway would just be
+  deleted. `cut` reads what it took off the fresh buffer, whose node ids are
+  still the selection's.
+- **A frame stays around a node that stays.** `_removeSelected` disbands a
+  selected group only when every member went. A member already gone counts as
+  gone, which is how the old explicit disband of an emptied frame still
+  happens.
+- **Paste filters too**, in `_withoutUncopyable`. A buffer copied here never
+  holds a refused node, but text on the system clipboard came from somewhere
+  else. A frame that held one is dropped, by the same rule a copy uses for a
+  frame that is only half selected.
+- **A copy that takes nothing empties both clipboards.** The built-in Ctrl+V
+  is `pasteFromSystem`, so emptying only the buffer would still paste the old
+  copy for any host with a codec. With nothing selected at all, copy still
+  changes nothing. That is the ordinary Ctrl+C on an empty selection, and the
+  connections-only case keeps its old reason.
+
 ## Waypoints
 
 A wire can be routed through points the user puts on it — `NodeConnection.waypoints`

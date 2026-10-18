@@ -176,9 +176,11 @@ class NodeEditorMenus {
     final controller = request.controller;
     final selection = controller.selection;
     final clipboard = controller.clipboard;
-    // Right-clicking selects first, so by the time these run there is always
-    // something under them.
-    final hasSelection = selection.nodeIds.isNotEmpty;
+    // Right-clicking selects first, so there is always something under these
+    // — but it may be a node its definition keeps from being copied or
+    // deleted, and an entry that would do nothing is greyed out instead.
+    final canCopy = clipboard.canCopy;
+    final canDelete = selection.canDelete;
     final description = controller.definitions[node.type]?.description;
 
     return <NodeMenuEntry>[
@@ -187,21 +189,21 @@ class NodeEditorMenus {
         label: words.cut,
         icon: Icons.content_cut,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyX, control: true),
-        onSelected: hasSelection ? () => clipboard.cut() : null,
+        onSelected: canCopy ? () => clipboard.cut() : null,
       ),
       NodeMenuEntry(
         id: NodeMenuEntryId.copy,
         label: words.copy,
         icon: Icons.copy_outlined,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyC, control: true),
-        onSelected: hasSelection ? () => clipboard.copy() : null,
+        onSelected: canCopy ? () => clipboard.copy() : null,
       ),
       NodeMenuEntry(
         id: NodeMenuEntryId.delete,
         label: words.delete,
         icon: Icons.delete_outline,
         shortcut: const SingleActivator(LogicalKeyboardKey.delete),
-        onSelected: hasSelection ? selection.deleteSelected : null,
+        onSelected: canDelete ? selection.deleteSelected : null,
       ),
       const NodeMenuEntry.separator(),
       // "Group" for a fresh frame, "Add to group" when one is in the
@@ -252,6 +254,7 @@ class NodeEditorMenus {
   List<NodeMenuEntry> _groupEntries(NodeMenuRequest request, NodeGroup group) {
     final words = request.localizations;
     final controller = request.controller;
+    final canCopy = controller.clipboard.canCopy;
 
     return <NodeMenuEntry>[
       NodeMenuEntry(
@@ -259,14 +262,14 @@ class NodeEditorMenus {
         label: words.cut,
         icon: Icons.content_cut,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyX, control: true),
-        onSelected: () => controller.clipboard.cut(),
+        onSelected: canCopy ? () => controller.clipboard.cut() : null,
       ),
       NodeMenuEntry(
         id: NodeMenuEntryId.copy,
         label: words.copy,
         icon: Icons.copy_outlined,
         shortcut: const SingleActivator(LogicalKeyboardKey.keyC, control: true),
-        onSelected: () => controller.clipboard.copy(),
+        onSelected: canCopy ? () => controller.clipboard.copy() : null,
       ),
       // Says what it takes with it. Deleting a frame and leaving the nodes is
       // a different command, and it is the next one down.
@@ -275,7 +278,9 @@ class NodeEditorMenus {
         label: words.deleteWithContents,
         icon: Icons.delete_outline,
         shortcut: const SingleActivator(LogicalKeyboardKey.delete),
-        onSelected: controller.selection.deleteSelected,
+        onSelected: controller.selection.canDelete
+            ? controller.selection.deleteSelected
+            : null,
       ),
       NodeMenuEntry(
         id: NodeMenuEntryId.disband,

@@ -136,6 +136,8 @@ class NodeDefinition {
     this.description,
     this.defaultWidth,
     this.resizable = false,
+    this.deletable = true,
+    this.copyable = true,
     this.minWidth,
     this.maxWidth,
     this.maxHeight,
@@ -202,6 +204,26 @@ class NodeDefinition {
   /// declared height rather than of the box. A definition that would rather
   /// use the room than leave it blank reads the floor in [resolveHeight].
   final bool resizable;
+
+  /// Whether the editor's delete and cut may remove a node of this type.
+  ///
+  /// Off for a node a graph cannot do without — the one entry point, say. The
+  /// node stays selectable and draggable; Delete, the menus' Delete and Cut
+  /// simply leave it where it is and take the rest of the selection. Like
+  /// [GraphNode.draggable] for [NodeEditorController.applyLayout], it governs
+  /// what the *user* may do: the host's own
+  /// [NodeEditorController.removeNodes] still removes it.
+  final bool deletable;
+
+  /// Whether copy, cut, duplicate and paste may make another node of this
+  /// type.
+  ///
+  /// Off for a node there must only ever be one of. Copy and duplicate leave
+  /// it out of what they take, along with its wires and any frame around it;
+  /// a paste from somewhere else — another document's text on the system
+  /// clipboard — leaves it out on the way in. Cut leaves it in place, since
+  /// cutting what was not copied would only delete it.
+  final bool copyable;
 
   /// The narrowest a resize may leave the node, or [defaultWidth] — else
   /// [GraphNode.defaultWidth] — when unset. A card cannot be dragged
