@@ -125,6 +125,14 @@ class NodeDefinitionRegistry {
   bool allowsLabelEditing(NodeConnection connection) =>
       _linksByType[connection.type]?.editableLabel ?? false;
 
+  /// Whether the editor's delete and cut may remove [node] —
+  /// [NodeDefinition.deletable], and true for a type with no definition.
+  bool allowsDeleting(GraphNode node) => _byType[node.type]?.deletable ?? true;
+
+  /// Whether copy, cut, duplicate and paste may make another of [node] —
+  /// [NodeDefinition.copyable], and true for a type with no definition.
+  bool allowsCopying(GraphNode node) => _byType[node.type]?.copyable ?? true;
+
   /// The caption [connection] should show, or null when it shows none.
   ///
   /// A derived caption is computed here rather than stored, so it follows

@@ -14,6 +14,20 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   any field left null keeps the connection's own colour or the theme's.
   `ConnectionDash.dashed` and `.dotted` are ready-made patterns. The minimap
   is unchanged.
+- **`NodeDefinition.deletable` and `copyable`** (both `true`): a node the
+  graph cannot do without stays selectable and draggable, but Delete and Cut
+  leave it in place, and Copy, Cut, Duplicate and Paste never make a second
+  one. Its wires and any frame around it are left out of a copy with it. The
+  menus grey out an entry that would do nothing. The host's own
+  `removeNodes` is unaffected.
+
+### Changed
+
+- **A copy that takes nothing empties the clipboard.** Copying a selection
+  made only of nodes that may not be copied used to leave the previous copy
+  in place, so the next paste brought back something unrelated. The system
+  clipboard is emptied too when copies are mirrored there. Copying with
+  nothing selected still changes nothing.
 
 ### Fixed
 

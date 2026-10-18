@@ -73,19 +73,51 @@ class NodeEditorClipboard {
   /// Returns false — and leaves any existing buffer alone — when no node is
   /// selected. A selected *connection* is not a copy on its own: a wire with
   /// nothing on either end is not something that can be pasted anywhere.
+  ///
+  /// Nodes whose definition is not [NodeDefinition.copyable] are left out.
+  /// When that leaves nothing, the buffer is **emptied** and false returned:
+  /// somebody asked to copy, and a paste that then produced an unrelated
+  /// earlier copy would be the worse surprise. The system clipboard is
+  /// emptied with it when copies are mirrored there, because that is the one
+  /// Ctrl+V reads first.
   bool copy() {
-    final fragment = _fragmentOf(_controller.selection.nodeIdsWithGroups);
-    if (fragment == null) return false;
+    final selected = _controller.selection.nodeIdsWithGroups;
+    if (selected.isEmpty) return false;
+    final fragment = _fragmentOf(selected);
+    if (fragment == null) {
+      clear();
+      if (_codec != null) {
+        Clipboard.setData(const ClipboardData(text: '')).ignore();
+      }
+      return false;
+    }
     _buffer = fragment;
     _pasteCount = 0;
     _writeSystem(fragment);
     return true;
   }
 
-  /// Copies the selection and then deletes it, as a single undo step.
+  /// Whether [copy] would take anything, so a menu can grey its entry out.
+  bool get canCopy => _controller.selection.nodeIdsWithGroups.any((id) {
+    final node = _controller._graph.nodes[id];
+    return node != null && _controller._definitions.allowsCopying(node);
+  });
+
+  /// Copies the selection and then deletes what was copied, as a single undo
+  /// step.
+  ///
+  /// A node that was not copied stays, whatever its definition says about
+  /// deleting it: cutting what never reached the clipboard would only delete
+  /// it. So does one that was copied but is not [NodeDefinition.deletable].
   bool cut() {
     if (!copy()) return false;
-    _controller.selection.deleteSelected();
+    // A fresh fragment still carries the selection's own ids — only its
+    // positions were moved — so it is the list of what was taken.
+    final copied = _buffer!.graph.nodes;
+    final definitions = _controller._definitions;
+    _controller.selection._removeSelected(
+      (node) => copied.containsKey(node.id) && definitions.allowsDeleting(node),
+    );
     return true;
   }
 
@@ -174,13 +206,19 @@ class NodeEditorClipboard {
     return kept;
   }
 
-  GraphFragment? _fragmentOf(Set<String> ids) {
+  GraphFragment? _fragmentOf(Set<String> selected) {
     final graph = _controller._graph;
+    final definitions = _controller._definitions;
     final nodes = <GraphNode>[
-      for (final id in ids)
-        if (graph.nodes[id] case final GraphNode node) node,
+      for (final id in selected)
+        if (graph.nodes[id] case final GraphNode node
+            when definitions.allowsCopying(node))
+          node,
     ];
     if (nodes.isEmpty) return null;
+    // What was left out is not in the fragment, so neither are its wires nor
+    // a frame around it: the rules below already say so, given the right ids.
+    final ids = <String>{for (final node in nodes) node.id};
 
     final origin = _topLeftOf(nodes);
     return GraphFragment(
@@ -215,6 +253,38 @@ class NodeEditorClipboard {
     );
   }
 
+  /// [fragment] without the nodes [NodeDefinition.copyable] refuses, their
+  /// wires, and any frame that held one — or [fragment] itself when there are
+  /// none, which is every paste of a buffer this clipboard made.
+  GraphFragment _withoutUncopyable(GraphFragment fragment) {
+    final definitions = _controller._definitions;
+    final refused = <String>{
+      for (final node in fragment.graph.nodes.values)
+        if (!definitions.allowsCopying(node)) node.id,
+    };
+    if (refused.isEmpty) return fragment;
+    final graph = fragment.graph;
+    return GraphFragment(
+      graph: NodeGraph(
+        nodes: <GraphNode>[
+          for (final node in graph.nodes.values)
+            if (!refused.contains(node.id)) node,
+        ],
+        connections: <NodeConnection>[
+          for (final connection in graph.connections.values)
+            if (!refused.contains(connection.from.nodeId) &&
+                !refused.contains(connection.to.nodeId))
+              connection,
+        ],
+        groups: <NodeGroup>[
+          for (final group in graph.groups.values)
+            if (!group.nodeIds.any(refused.contains)) group,
+        ],
+      ),
+      origin: fragment.origin,
+    );
+  }
+
   static Offset _topLeftOf(Iterable<GraphNode> nodes) {
     var left = double.infinity;
     var top = double.infinity;
@@ -228,10 +298,14 @@ class NodeEditorClipboard {
   // --------------------------------------------------------------- pasting
 
   Set<String> _paste(
-    GraphFragment fragment, {
+    GraphFragment whole, {
     Offset? scenePosition,
     int step = 1,
   }) {
+    // A buffer copied here holds nothing the definitions refuse, but text on
+    // the system clipboard came from somewhere else and may.
+    final fragment = _withoutUncopyable(whole);
+    if (fragment.isEmpty) return const <String>{};
     final base = scenePosition ?? fragment.origin + nudge * step.toDouble();
 
     // Fresh ids for everything. Port ids are node-local, so they ride along

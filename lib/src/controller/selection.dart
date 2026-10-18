@@ -143,15 +143,47 @@ class NodeEditorSelection {
   /// A selected group takes its contents with it. Deleting the frame and
   /// leaving the nodes is what "disband" means, and it has its own command;
   /// `Del` on a frame is asked for when the whole branch is unwanted.
+  ///
+  /// A node whose definition is not [NodeDefinition.deletable] stays, and so
+  /// does the frame around it.
   void deleteSelected() {
     if (isEmpty) return;
+    _removeSelected(_controller._definitions.allowsDeleting);
+  }
+
+  /// Whether [deleteSelected] would remove anything, so a menu can grey its
+  /// entry out rather than offer a command that does nothing.
+  bool get canDelete =>
+      _connectionIds.isNotEmpty ||
+      _nodesWhere(_controller._definitions.allowsDeleting).isNotEmpty;
+
+  /// The selected nodes, groups expanded, that [test] lets through.
+  List<String> _nodesWhere(bool Function(GraphNode node) test) => <String>[
+    for (final id in nodeIdsWithGroups)
+      if (_controller._graph.nodes[id] case final GraphNode node
+          when test(node))
+        id,
+  ];
+
+  /// Removes the selected wires and the selected nodes [removable] lets go,
+  /// as one undo step, and clears the selection.
+  ///
+  /// Shared with cut, which removes only what it copied.
+  void _removeSelected(bool Function(GraphNode node) removable) {
+    final doomed = _nodesWhere(removable).toSet();
+    final emptied = <String>[
+      for (final id in _groupIds)
+        if (_controller._graph.groups[id] case final NodeGroup group
+            when group.nodeIds.every(doomed.contains))
+          id,
+    ];
     _controller.history.beginTransaction();
     _controller.removeConnections(_connectionIds.toList());
-    _controller.removeNodes(nodeIdsWithGroups.toList());
+    _controller.removeNodes(doomed.toList());
     // Removing every member empties the frames, and an empty group is pruned
     // by the graph — but a frame whose members were already gone would not be,
-    // so say it outright.
-    _controller.disbandGroups(_groupIds.toList());
+    // so say it outright. A frame keeping a node that may not go keeps it.
+    _controller.disbandGroups(emptied);
     _controller.history.commitTransaction();
     clear();
   }
