@@ -1,3 +1,5 @@
+import 'dart:ui' show ClipOp;
+
 import 'package:flutter/rendering.dart';
 
 import '../geometry/node_geometry.dart';
@@ -32,6 +34,8 @@ class PortsPainter extends CustomPainter {
     required this.viewport,
     required this.theme,
     required this.revision,
+    required this.selectionRevision,
+    required this.coversOf,
     this.hovered,
     this.highlighted,
     this.lifted,
@@ -51,6 +55,15 @@ class PortsPainter extends CustomPainter {
 
   /// [NodeEditorController.revision]: moves when geometry does.
   final int revision;
+
+  /// [NodeEditorSelection.revision]. Selecting a node raises it, which
+  /// changes which cards are drawn over which handles.
+  final int selectionRevision;
+
+  /// The boxes painted over a node's handles —
+  /// [NodeEditorLayout.coversOf] — which they are clipped out of, so a node
+  /// underneath another keeps its handles underneath too.
+  final List<Rect> Function(GraphNode node) coversOf;
 
   /// The handle under the pointer, and the one a dragged wire would land on.
   final PortRef? hovered;
@@ -79,15 +92,22 @@ class PortsPainter extends CustomPainter {
     final border = radius * 0.34;
     // Batched by colour, since a port may carry its own. Most graphs use one,
     // so this is a couple of paths for any number of handles.
-    final fills = <Color, Path>{};
-    final strokes = <Color, Path>{};
-    final active = <(Offset, PortShape)>[];
+    final batched = _Handles();
+    // A node with a card painted over it draws its handles on their own,
+    // clipped out of that card. Overlap is the exception, so the batch above
+    // stays the whole picture on most frames.
+    final covered = <(List<Rect>, _Handles)>[];
+    final active = <(Offset, PortShape, List<Rect>)>[];
 
     final focus = lifted;
     for (final node in nodes) {
       if (focus != null && focus.isNotEmpty && !focus.contains(node.id)) {
         continue;
       }
+      if (node.ports.isEmpty) continue;
+      final covers = coversOf(node);
+      final into = covers.isEmpty ? batched : _Handles();
+      if (covers.isNotEmpty) covered.add((covers, into));
       final nodeSize = sizeOf(node);
       final connected = connectedPorts[node.id];
       for (final port in node.ports) {
@@ -95,7 +115,7 @@ class PortsPainter extends CustomPainter {
         final base = port.color ?? theme.portColor;
         final ref = PortRef(node.id, port.id);
         if (ref == hovered || ref == highlighted) {
-          active.add((centre, theme.shapeOf(port.kind)));
+          active.add((centre, theme.shapeOf(port.kind), covers));
           continue;
         }
         final filled = connected?.contains(port.id) ?? false;
@@ -103,17 +123,13 @@ class PortsPainter extends CustomPainter {
         // shapes lines up and the hit target stays one rule for all of them
         // (`NodeEditorLayout.portAt` is still a radius).
         final shape = theme.shapeOf(port.kind);
-        fills[filled ? base : theme.background] = Path.combine(
-          PathOperation.union,
-          fills[filled ? base : theme.background] ?? Path(),
-          shape.path(centre, radius),
-        );
-        // Stroked on the centre line, inset by half the width, so the drawn
-        // outer edge lands on `radius` the way a border inside a box does.
-        strokes[base] = Path.combine(
-          PathOperation.union,
-          strokes[base] ?? Path(),
-          shape.path(centre, radius - border / 2),
+        into.add(
+          fill: filled ? base : theme.background,
+          stroke: base,
+          fillPath: shape.path(centre, radius),
+          // Stroked on the centre line, inset by half the width, so the drawn
+          // outer edge lands on `radius` the way a border inside a box does.
+          strokePath: shape.path(centre, radius - border / 2),
         );
       }
     }
@@ -122,29 +138,40 @@ class PortsPainter extends CustomPainter {
       ..save()
       ..transform(viewport.toMatrix4().storage);
 
-    fills.forEach((color, path) {
-      canvas.drawPath(path, Paint()..color = color);
-    });
-    strokes.forEach((color, path) {
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = border,
-      );
-    });
+    batched.draw(canvas, border);
+    for (final (covers, handles) in covered) {
+      _clippedOutOf(canvas, covers, () => handles.draw(canvas, border));
+    }
 
     // Drawn last and larger, so the handle being aimed at reads on top of its
     // neighbours rather than under whichever node happens to paint later.
     final grown = radius * 1.3;
-    for (final (centre, shape) in active) {
-      canvas.drawPath(
-        shape.path(centre, grown),
-        Paint()..color = theme.portHoverColor,
+    for (final (centre, shape, covers) in active) {
+      _clippedOutOf(
+        canvas,
+        covers,
+        () => canvas.drawPath(
+          shape.path(centre, grown),
+          Paint()..color = theme.portHoverColor,
+        ),
       );
     }
 
+    canvas.restore();
+  }
+
+  /// Runs [draw] with every box in [covers] cut out of the canvas.
+  static void _clippedOutOf(
+    Canvas canvas,
+    List<Rect> covers,
+    VoidCallback draw,
+  ) {
+    if (covers.isEmpty) return draw();
+    canvas.save();
+    for (final box in covers) {
+      canvas.clipRect(box, clipOp: ClipOp.difference);
+    }
+    draw();
     canvas.restore();
   }
 
@@ -155,6 +182,46 @@ class PortsPainter extends CustomPainter {
       oldDelegate.theme != theme ||
       oldDelegate.hovered != hovered ||
       oldDelegate.highlighted != highlighted ||
+      oldDelegate.selectionRevision != selectionRevision ||
       !identical(oldDelegate.connectedPorts, connectedPorts) ||
       !identical(oldDelegate.lifted, lifted);
+}
+
+/// Handle fills and outlines, merged into one path per colour.
+class _Handles {
+  final Map<Color, Path> _fills = <Color, Path>{};
+  final Map<Color, Path> _strokes = <Color, Path>{};
+
+  void add({
+    required Color fill,
+    required Color stroke,
+    required Path fillPath,
+    required Path strokePath,
+  }) {
+    _fills[fill] = Path.combine(
+      PathOperation.union,
+      _fills[fill] ?? Path(),
+      fillPath,
+    );
+    _strokes[stroke] = Path.combine(
+      PathOperation.union,
+      _strokes[stroke] ?? Path(),
+      strokePath,
+    );
+  }
+
+  void draw(Canvas canvas, double border) {
+    _fills.forEach((color, path) {
+      canvas.drawPath(path, Paint()..color = color);
+    });
+    _strokes.forEach((color, path) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = border,
+      );
+    });
+  }
 }

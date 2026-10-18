@@ -115,7 +115,10 @@ exactly when the user is moving.
   cost per pixel rather than per line. `GridPainter` falls back to lines if it
   fails to compile.
 - **Port handles** were forty-odd render objects each. `PortsPainter` batches
-  them by colour; `NodeEditorLayout.portAt` answers every press. Both read
+  them by colour; `NodeEditorLayout.portAt` answers every press. A handle
+  is drawn above every card, so one under a card painted over its own is
+  *clipped out of* that card rather than drawn beneath it — see *Handles
+  under a card*. Both read
   `NodeGeometry`, so what is drawn and what is picked cannot drift apart.
   `NodeEditorTheme.portMinScale` (0.25) gates drawing *and* hitting with one
   rule — an invisible dot that still starts a wire is worse than one plainly
@@ -123,6 +126,45 @@ exactly when the user is moving.
 - **Curves batch by colour** into one `Path` per colour. Direction markers are
   sampled once when the curve is built (`ConnectionGeometry.arrows`), never
   measured per frame.
+
+## Handles under a card
+
+The ports layer sits above the whole node layer so a handle reads over its
+own card's border and over any card beneath it. A card painted *over* the
+handle's node has to cover it, though, or the lower node's dots float over
+the top card and win its presses (#29).
+
+**Clipped, not interleaved.** Drawing each node's handles in the node stack
+right after its card would get the order for free. But it costs a painter per
+node, it splits the batch, and it means the scrim rule and the hover growth
+have to be redone per slot. Instead `layout.coversOf(node, reach:)` returns
+the boxes of higher-ranked nodes near a node's handles, and the painter draws
+that node's handles under a `ClipOp.difference` clip of each. Nodes with no
+covers batch as before, and overlap is the exception. The answer is memoised
+until `revision` or the raised set moves, so a pan, which repaints the layer,
+costs lookups and no queries. A node with no ports is never asked. Group
+frames are not covers, being beneath their members and pointer-transparent.
+Comments are covers.
+
+**`portAt` applies the same rule**: it skips a candidate whose owner ranks
+below the node under the pointer. The check sits inside the loop, so a
+covered handle nearby cannot shadow a visible one farther off. Every press
+path asks `portAt`, so nothing else changed. `PortsPainter` repaints on the
+selection revision too, because selecting a node raises it and changes which
+card covers which handle.
+
+**This needed paint order to be a total order, and it was not.** `_rank` was
+raised-or-not. `_inPaintOrder` sorted the spatial hash's survivors with an
+unstable sort, and `nodeAt` broke ties by hash iteration order, so two
+overlapping unselected nodes could be drawn one way and picked the other. The
+tie-break is now **document order** (the user's call): the node map keeps
+insertion order through `putNodes`, so a dragged node keeps its rank and the
+newest is on top. The rank is one int, raised nodes offset by the node count.
+`_documentOrder` is cached on the map's identity and rebuilt on every drag
+frame, because `putNodes` replaces the map. Measured, it costs nothing visible
+at 2000 nodes. If it ever does, carry the order across while the key set is
+unchanged. `port_occlusion_test.dart` uses forty nodes because Dart's sort is
+an insertion sort, and so stable, up to thirty-two.
 
 ## Caches, and what they key on
 
