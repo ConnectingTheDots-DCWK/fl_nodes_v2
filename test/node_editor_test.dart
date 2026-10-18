@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -576,6 +577,82 @@ void main() {
     expect(now.dx, closeTo(under.dx, 0.001));
     expect(now.dy, closeTo(under.dy, 0.001));
     await tester.sendEventToBinding(trackpad.panZoomEnd());
+  });
+
+  // Windows sends DirectManipulation's transform: `pan` is the `t` of
+  // `x ↦ s·x + t` in window coordinates, scaled about the fingers, and
+  // `position` is the mouse cursor. Read as a translation plus a zoom about
+  // the cursor, a pinch threw the view by `centroid × (1 − s)`.
+  testWidgets('a Windows pinch keeps what is under the fingers there', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final controller = NodeEditorController(graph: NodeGraph());
+    addTearDown(controller.dispose);
+
+    // Not at the window's corner, as under an app's toolbar: the transform
+    // is the window's, the camera the editor's.
+    const origin = Offset(100, 50);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Padding(
+          padding: EdgeInsets.only(left: origin.dx, top: origin.dy),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 800,
+              height: 600,
+              child: NodeEditor(
+                controller: controller,
+                theme: NodeEditorTheme.dark(),
+                nodeBuilder: (context, graphNode, state) =>
+                    const ColoredBox(color: Color(0xFF2A2E38)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Future<void> pinch(double s, Offset drift) async {
+      const cursor = Offset(150, 120);
+      const fingers = Offset(500, 350);
+      final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+      await tester.sendEventToBinding(trackpad.panZoomStart(cursor));
+      await tester.pump();
+      for (var i = 1; i <= 4; i++) {
+        final step = 1 + (s - 1) * i / 4;
+        await tester.sendEventToBinding(
+          trackpad.panZoomUpdate(
+            cursor,
+            pan: fingers * (1 - step) + drift * (i / 4),
+            scale: step,
+          ),
+        );
+        await tester.pump();
+      }
+      await tester.sendEventToBinding(trackpad.panZoomEnd());
+      await tester.pump();
+    }
+
+    final fingers = const Offset(500, 350) - origin;
+    var under = controller.camera.viewport.toScene(fingers);
+    await pinch(1.6, const Offset(20, 10));
+    var now = controller.camera.viewport.toScene(
+      fingers + const Offset(20, 10),
+    );
+    expect(controller.camera.viewport.scale, closeTo(1.6, 0.001));
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+
+    // Past the limit it stops there, still about the fingers.
+    under = controller.camera.viewport.toScene(fingers);
+    await pinch(100, Offset.zero);
+    now = controller.camera.viewport.toScene(fingers);
+    expect(controller.camera.viewport.scale, controller.camera.maxScale);
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('an unselected node drags immediately, selecting as it goes', (

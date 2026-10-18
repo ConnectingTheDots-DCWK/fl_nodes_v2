@@ -11,6 +11,8 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   two-finger swipe moved the canvas twice as far as the fingers, a pinch let
   the board slide out from under them, and a swipe after clicking a handle
   dragged a wire out of it.
+- **A pinch on Windows zooms about the fingers.** It zoomed about the mouse
+  cursor and threw the view sideways by hundreds of pixels on a wide window.
 
 ## 1.3.0
 

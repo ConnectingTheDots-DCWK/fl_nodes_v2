@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
@@ -21,6 +22,8 @@ void main() async {
 
   runApp(const NodeEditorDemoApp());
 }
+
+const _logPointers = bool.fromEnvironment('LOG_POINTERS');
 
 class NodeEditorDemoApp extends StatefulWidget {
   const NodeEditorDemoApp({super.key});
@@ -377,6 +380,43 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
   }
 
   Widget _buildEditor() {
+    final editor = _buildNodeEditor();
+    if (!_logPointers) return editor;
+    // `--dart-define=LOG_POINTERS=true`: every raw pointer event the canvas
+    // is handed, and where the camera stood after it, for diagnosing a
+    // trackpad on a platform the tests cannot reproduce.
+    String o(Offset v) =>
+        '(${v.dx.toStringAsFixed(1)}, ${v.dy.toStringAsFixed(1)})';
+    void log(PointerEvent e, String extra) {
+      final vp = _controller.camera.viewport;
+      debugPrint(
+        '${e.timeStamp.inMilliseconds} ${e.runtimeType} kind=${e.kind.name} '
+        'buttons=${e.buttons} pos=${o(e.position)} $extra'
+        ' | camera ${o(vp.offset)} x${vp.scale.toStringAsFixed(3)}',
+      );
+    }
+
+    return Listener(
+      onPointerDown: (e) => log(e, ''),
+      onPointerUp: (e) => log(e, ''),
+      onPointerMove: (e) => log(e, 'delta=${o(e.delta)}'),
+      onPointerSignal: (e) => log(e, switch (e) {
+        PointerScrollEvent(:final scrollDelta) => 'scroll=${o(scrollDelta)}',
+        PointerScaleEvent(:final scale) => 'scale=$scale',
+        _ => '',
+      }),
+      onPointerPanZoomStart: (e) => log(e, ''),
+      onPointerPanZoomUpdate: (e) => log(
+        e,
+        'pan=${o(e.pan)} panDelta=${o(e.panDelta)} '
+        'scale=${e.scale.toStringAsFixed(4)} rotation=${e.rotation}',
+      ),
+      onPointerPanZoomEnd: (e) => log(e, ''),
+      child: editor,
+    );
+  }
+
+  Widget _buildNodeEditor() {
     return NodeEditor(
       key: _editorKey,
       controller: _controller,

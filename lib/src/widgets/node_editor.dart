@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FragmentShader;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
@@ -337,7 +337,7 @@ class NodeEditorState extends State<NodeEditor>
   Offset? _pointerDownPosition;
 
   // Trackpad pan/zoom state.
-  double _panZoomStartScale = 1;
+  ViewportTransform _panZoomStart = ViewportTransform.identity;
   Offset _panZoomLastPan = Offset.zero;
 
   // Node drag state.
@@ -931,22 +931,57 @@ class NodeEditorState extends State<NodeEditor>
 
   void _handlePanZoomStart(PointerPanZoomStartEvent event) {
     if (_overMinimap(event.localPosition)) return;
-    _panZoomStartScale = _viewport.scale;
+    _panZoomStart = _viewport;
     _panZoomLastPan = Offset.zero;
   }
 
   void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
     if (_overMinimap(event.localPosition)) return;
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      _applyDirectManipulation(event);
+      return;
+    }
     _controller.camera.panBy(event.localPan - _panZoomLastPan);
     _panZoomLastPan = event.localPan;
     if (event.scale != 1.0) {
       // `localPosition` is where the gesture began; the fingers are `localPan`
       // on from it, and what is under them is what has to stay there.
       _controller.camera.setScale(
-        _panZoomStartScale * event.scale,
+        _panZoomStart.scale * event.scale,
         focalScreenPoint: event.localPosition + event.localPan,
       );
     }
+  }
+
+  // Windows means something else by the same event. Its `pan` is
+  // DirectManipulation's content transform — the affine `x ↦ s·x + t` in the
+  // window's coordinates, its scale taken about the fingers, so `t` already
+  // holds the shift a pinch makes about them — and its `position` is wherever
+  // the mouse cursor was. Read as a finger translation plus a zoom about that
+  // position, a pinch threw the view by `centroid × (1 − scale)`: hundreds of
+  // pixels on a wide window. So the transform is applied as it is, to the
+  // viewport the gesture began on; the fingers' centroid is never needed.
+  void _applyDirectManipulation(PointerPanZoomUpdateEvent event) {
+    final s = event.scale;
+    // The affine is in window coordinates; this is where ours begin in them.
+    final origin = event.position - event.localPosition;
+    final shift = event.pan + origin * (s - 1);
+    final camera = _controller.camera;
+    final scale = _panZoomStart.scale * s;
+    if (scale >= camera.minScale && scale <= camera.maxScale) {
+      camera.viewport = ViewportTransform(
+        offset: _panZoomStart.offset * s + shift,
+        scale: scale,
+      );
+      return;
+    }
+    // Past a zoom limit, stop at it about the point the pinch holds still —
+    // the affine's fixed point, `shift / (1 − s)`.
+    final pinned = (1 - s).abs() < 1e-6 ? event.localPosition : shift / (1 - s);
+    camera.viewport = _panZoomStart.zoomedAt(
+      pinned,
+      scale.clamp(camera.minScale, camera.maxScale),
+    );
   }
 
   void _handleHover(PointerHoverEvent event) {

@@ -211,7 +211,25 @@ the canvas recogniser heard every swipe as well. That panned twice, and since
 swipe after a click on a handle dragged a wire out of it. `_handleScaleStart`
 blocks a `details.kind == trackpad` gesture. The zoom is pinned at
 `localPosition + localPan`: `localPosition` on an update is where the gesture
-began, not where the fingers are. A
+began, not where the fingers are.
+
+**Windows sends the same event meaning something else**, and
+`_applyDirectManipulation` is the branch for it — read in the engine,
+`shell/platform/windows/direct_manipulation.cc` and `flutter_windows_view.cc`.
+`pan` is not a finger translation: it is the `t` of DirectManipulation's content
+transform `x ↦ s·x + t`, in window coordinates, whose scale is taken about the
+fingers' centroid — so `t` already holds the `centroid × (1 − s)` a zoom about
+them makes. And `position` is the mouse cursor's, not the fingers'. The
+macOS reading, applied there, zoomed about the cursor *and* added that shift:
+the view jumped by hundreds of pixels per pinch. The branch applies the
+affine as it is to the viewport the gesture began on, shifted by
+`origin × (s − 1)` because the editor's local frame is not the window's; at a
+zoom limit it stops about the affine's fixed point, `shift / (1 − s)`. The
+centroid itself is never known and never needed. One thing the engine does
+that this cannot correct: it resets the content transform only after
+**inertia**, so if a pinch ever ends without passing through it, the next
+gesture's `pan` carries a stale term of `(1 − s) × T₀`. Unseen so far;
+`LOG_POINTERS=true` on the example prints every raw event if it is. A
 browser has no such event, so on the web a trackpad is wheel events, and the
 engine (`pointer_binding.dart`, `_convertWheelEventToPointerData`) sorts them:
 a wheel with `ctrlKey` — which is what a pinch *is* — becomes a
