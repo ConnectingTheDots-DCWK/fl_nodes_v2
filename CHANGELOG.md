@@ -3,6 +3,14 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## Unreleased
+
+### Fixed
+
+- **pub.dev links the repository and the live demo again.** Both moved to
+  `ConnectingTheDots-DCWK`; the demo's old address is a 404, and the old
+  repository address no longer verified, so pub.dev showed no repository link.
+
 ## 1.2.2
 
 A hotfix: a laptop trackpad works in a browser, and the editor's own chrome
