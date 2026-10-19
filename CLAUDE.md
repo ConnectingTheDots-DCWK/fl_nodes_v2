@@ -258,6 +258,20 @@ which is what Figma and Miro do too. Do not scale the pinch by
 `zoomSensitivity` — the engine's factor is what `InteractiveViewer` uses, and
 the browser's own zoom feels the same.
 
+**A two-finger touch is the root `Listener`'s**, for the trackpad's reason
+from the other side. The canvas `ScaleGestureRecognizer` only hears fingers on
+empty canvas — a card above it in the stack takes its own — so two fingers on
+a card were two drags of it, and a pinch there threw and selected it. The
+`Listener` hears every finger: `_handleTouch*` keep `_touches`, the second
+finger calls `_abandonTouchGesture` — a node, waypoint or resize drag is
+**cancelled**, through `history.cancelTransaction`, not committed, and a
+wire is dropped — and `_touchNavigating` then refuses every start and tap
+until the last finger lifts. The pinch is absolute from its baseline: scale is
+the ratio of the fingers' spread, and the scene point under their starting
+midpoint stays under the current one. That is also why a canvas pinch now
+tracks the fingers exactly — the recogniser measured from where it won the
+arena, past the slop, and under-zoomed.
+
 A port handle straddles its node's border, so **two different recognisers** see
 the two halves of one dot. Every entry point re-checks `_portAt` first:
 `_handleScaleStart`, `_handleNodeDragStart`, and the secondary-tap path.

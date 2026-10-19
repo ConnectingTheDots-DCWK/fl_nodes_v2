@@ -740,6 +740,96 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  // A card sits above the canvas recogniser, so two fingers on one were two
+  // drags of the card: a pinch there moved it and selected it.
+  testWidgets('a two-finger pinch over a card zooms and leaves the card', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(
+      graph: NodeGraph(
+        nodes: <GraphNode>[node('a', position: const Offset(100, 100))],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    // Both fingers inside the card, spreading from 80 apart to 200 while
+    // their midpoint travels.
+    const centre = Offset(170, 130);
+    final under = controller.camera.viewport.toScene(centre);
+    final left = await tester.startGesture(
+      centre - const Offset(40, 0),
+      pointer: 1,
+    );
+    final right = await tester.startGesture(
+      centre + const Offset(40, 0),
+      pointer: 2,
+    );
+    await tester.pump();
+    for (var i = 1; i <= 6; i++) {
+      final spread = 40 + 60 * i / 6;
+      final travel = Offset(5.0 * i, 3.0 * i);
+      await left.moveTo(centre + travel - Offset(spread, 0));
+      await right.moveTo(centre + travel + Offset(spread, 0));
+      await tester.pump();
+    }
+    await left.up();
+    await right.up();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final now = controller.camera.viewport.toScene(
+      centre + const Offset(30, 18),
+    );
+    expect(controller.camera.viewport.scale, closeTo(2.5, 0.001));
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+    expect(controller.graph.node('a')!.position, const Offset(100, 100));
+    expect(controller.selection.nodeIds, isEmpty);
+    expect(controller.history.canUndo, isFalse);
+  });
+
+  testWidgets('a second finger takes back the drag the first had begun', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(
+      graph: NodeGraph(
+        nodes: <GraphNode>[node('a', position: const Offset(100, 100))],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    final first = await tester.startGesture(const Offset(170, 130), pointer: 1);
+    for (var i = 1; i <= 4; i++) {
+      await first.moveTo(Offset(170.0 + 10 * i, 130));
+      await tester.pump();
+    }
+    expect(
+      controller.graph.node('a')!.position,
+      const Offset(140, 100),
+      reason: 'the first finger alone drags the card',
+    );
+
+    final second = await tester.startGesture(
+      const Offset(500, 400),
+      pointer: 2,
+    );
+    await tester.pump();
+    await first.moveTo(const Offset(180, 130));
+    await second.moveTo(const Offset(560, 400));
+    await tester.pump();
+
+    expect(controller.graph.node('a')!.position, const Offset(100, 100));
+    expect(controller.history.canUndo, isFalse);
+    expect(controller.camera.viewport.scale, greaterThan(1.0));
+    await first.up();
+    await second.up();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(controller.graph.node('a')!.position, const Offset(100, 100));
+  });
+
   testWidgets('an unselected node drags immediately, selecting as it goes', (
     tester,
   ) async {
