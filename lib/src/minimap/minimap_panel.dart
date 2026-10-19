@@ -13,6 +13,7 @@ import 'minimap_painter.dart';
 import 'minimap_palette.dart';
 import 'minimap_scene.dart';
 import '../widgets/corner_grip.dart';
+import '../widgets/node_view.dart' show canvasDragDevices;
 
 /// The minimap, as a panel floating over the canvas.
 ///
@@ -366,6 +367,7 @@ class _MinimapBar extends StatelessWidget {
         // cursor rather than trailing it by the touch slop — the same reason
         // the group handle does it.
         dragStartBehavior: DragStartBehavior.down,
+        supportedDevices: canvasDragDevices,
         onPanStart: onDragStart,
         onPanUpdate: onDragUpdate,
         onPanEnd: (_) => onDragEnd(),
@@ -599,6 +601,7 @@ class _MinimapGrip extends StatelessWidget {
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       dragStartBehavior: DragStartBehavior.down,
+      supportedDevices: canvasDragDevices,
       onPanStart: onStart,
       onPanUpdate: onUpdate,
       child: CornerGrip(color: color),

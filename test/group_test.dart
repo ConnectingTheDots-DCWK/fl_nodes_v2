@@ -467,6 +467,38 @@ void main() {
       );
     });
 
+    // A swipe moves the camera and the grip under the cursor together, so a
+    // handle that took it would select its group and leave it standing still.
+    testWidgets('a trackpad swipe over the handle pans and takes nothing', (
+      tester,
+    ) async {
+      final controller = await pump(tester);
+      controller.selection.selectNodes(<String>['a', 'b']);
+      controller.groupSelection();
+      controller.selection.clear();
+      await tester.pumpAndSettle();
+
+      final at = tester.getCenter(find.byIcon(Icons.drag_indicator));
+      final start = controller.camera.viewport.offset;
+      final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+      await tester.sendEventToBinding(trackpad.panZoomStart(at));
+      await tester.pump();
+      for (var i = 1; i <= 10; i++) {
+        await tester.sendEventToBinding(
+          trackpad.panZoomUpdate(at, pan: Offset(6.0 * i, 0)),
+        );
+        await tester.pump();
+      }
+      await tester.sendEventToBinding(trackpad.panZoomEnd());
+      await tester.pumpAndSettle();
+
+      expect(controller.camera.viewport.offset, start + const Offset(60, 0));
+      expect(controller.selection.groupIds, isEmpty);
+      expect(controller.history.canUndo, isTrue, reason: 'the grouping');
+      controller.history.undo();
+      expect(controller.graph.groups, isEmpty, reason: 'and nothing after it');
+    });
+
     testWidgets(
       'the frame itself takes no clicks, and paints below its own members',
       (tester) async {

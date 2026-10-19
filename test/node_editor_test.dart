@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -494,6 +495,249 @@ void main() {
     expect(controller.camera.viewport.scale, closeTo(start.scale * 1.5, 0.001));
     expect(after.dx, closeTo(before.dx, 0.001));
     expect(after.dy, closeTo(before.dy, 0.001));
+  });
+
+  // Native desktop sends a trackpad as pan-zoom, which the canvas's
+  // `Listener` reads — and the scale recogniser accepts too. Acting on both
+  // panned twice, and the recogniser took the last mouse press as where the
+  // swipe began: a swipe after clicking a handle dragged a wire out of it.
+  testWidgets('a trackpad swipe pans once and never starts a wire', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(
+      graph: NodeGraph(
+        nodes: <GraphNode>[
+          node('a', position: const Offset(60, 60)),
+          node('b', position: const Offset(400, 300)),
+        ],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    final mouse = await tester.startGesture(
+      portPoint(tester, controller, 'a', 'out'),
+      kind: PointerDeviceKind.mouse,
+    );
+    await mouse.up();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Begun on `b`'s input, on the half of the handle outside its card where
+    // the canvas recogniser hears it: a wire dragged from the stale press
+    // would be dropped there, since the camera moves under it by the same pan.
+    final at = portPoint(tester, controller, 'b', 'in') - const Offset(3, 0);
+    final start = controller.camera.viewport;
+    final trackpad = TestPointer(2, PointerDeviceKind.trackpad);
+    await tester.sendEventToBinding(trackpad.panZoomStart(at));
+    await tester.pump();
+    for (var i = 1; i <= 5; i++) {
+      await tester.sendEventToBinding(
+        trackpad.panZoomUpdate(at, pan: Offset(10.0 * i, 0)),
+      );
+      await tester.pump();
+    }
+    await tester.sendEventToBinding(trackpad.panZoomEnd());
+    await tester.pump();
+
+    expect(
+      controller.camera.viewport.offset,
+      start.offset + const Offset(50, 0),
+    );
+    expect(controller.graph.connections, isEmpty);
+  });
+
+  // Seen on a Windows precision touchpad: a node's pan recogniser took the
+  // pan-zoom as a drag of whatever was under the cursor. A swipe moves that
+  // pointer and the camera together, so the card only got selected; but a
+  // pinch's `pan` carries its zoom about the fingers, which threw the card,
+  // and over a handle the wire's loose end stuck to the scene beside it.
+  testWidgets('a trackpad over a node moves the camera and nothing on it', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final controller = NodeEditorController(
+      graph: NodeGraph(
+        nodes: <GraphNode>[node('a', position: const Offset(60, 60))],
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    PendingConnection? pendingWire() {
+      final paint = tester.widget<CustomPaint>(
+        find.byWidgetPredicate(
+          (widget) => widget is CustomPaint && widget.painter is OverlayPainter,
+        ),
+      );
+      return (paint.painter! as OverlayPainter).pending;
+    }
+
+    // The shapes the log showed: `position` stays at the cursor and `pan`
+    // accumulates a few pixels an event. The editor sits at the window's
+    // corner here, so window and local coordinates agree.
+    Future<void> gesture(
+      Offset cursor,
+      Offset Function(int step) pan, {
+      double Function(int step)? scale,
+    }) async {
+      final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+      await tester.sendEventToBinding(trackpad.panZoomStart(cursor));
+      await tester.pump();
+      for (var i = 1; i <= 10; i++) {
+        await tester.sendEventToBinding(
+          trackpad.panZoomUpdate(
+            cursor,
+            pan: pan(i),
+            scale: scale?.call(i) ?? 1,
+          ),
+        );
+        await tester.pump();
+        expect(pendingWire(), isNull, reason: 'step $i drew a wire');
+      }
+      await tester.sendEventToBinding(trackpad.panZoomEnd());
+      await tester.pump();
+    }
+
+    await tester.pumpWidget(harness(controller));
+
+    var start = controller.camera.viewport.offset;
+    await gesture(const Offset(130, 90), (i) => Offset(8.0 * i, 2.0 * i));
+    expect(controller.camera.viewport.offset, start + const Offset(80, 20));
+    expect(controller.selection.nodeIds, isEmpty);
+
+    // The inner half of the handle, over the card, where the node's own
+    // recogniser hears it rather than the canvas's.
+    start = controller.camera.viewport.offset;
+    await gesture(
+      portPoint(tester, controller, 'a', 'out') - const Offset(3, 0),
+      (i) => Offset(-6.0 * i, 0),
+    );
+    expect(controller.camera.viewport.offset, start + const Offset(-60, 0));
+
+    // Windows hit-tests a pan-zoom at the cursor, not the fingers, so it is
+    // the cursor resting on the card that brings the card into it.
+    final cursor = controller.camera.viewport.toScreen(const Offset(130, 90));
+    const fingers = Offset(500, 350);
+    await gesture(
+      cursor,
+      (i) => fingers * (1 - (1 + 0.05 * i)),
+      scale: (i) => 1 + 0.05 * i,
+    );
+    expect(controller.camera.viewport.scale, closeTo(1.5, 0.001));
+
+    expect(controller.graph.node('a')!.position, const Offset(60, 60));
+    expect(controller.selection.nodeIds, isEmpty);
+    expect(controller.graph.connections, isEmpty);
+    expect(controller.history.canUndo, isFalse);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('a trackpad pinch keeps what is under the fingers there', (
+    tester,
+  ) async {
+    final controller = NodeEditorController(graph: NodeGraph());
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(harness(controller));
+
+    const at = Offset(400, 300);
+    final under = controller.camera.viewport.toScene(at);
+    final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+    await tester.sendEventToBinding(trackpad.panZoomStart(at));
+    await tester.pump();
+    // Fingers never pinch in place: the centroid drifts as they spread.
+    for (var i = 1; i <= 10; i++) {
+      await tester.sendEventToBinding(
+        trackpad.panZoomUpdate(
+          at,
+          pan: Offset(3.0 * i, 2.0 * i),
+          scale: 1 + 0.08 * i,
+        ),
+      );
+      await tester.pump();
+    }
+
+    final now = controller.camera.viewport.toScene(at + const Offset(30, 20));
+    expect(controller.camera.viewport.scale, closeTo(1.8, 0.001));
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+    await tester.sendEventToBinding(trackpad.panZoomEnd());
+  });
+
+  // Windows sends DirectManipulation's transform: `pan` is the `t` of
+  // `x ↦ s·x + t` in window coordinates, scaled about the fingers, and
+  // `position` is the mouse cursor. Read as a translation plus a zoom about
+  // the cursor, a pinch threw the view by `centroid × (1 − s)`.
+  testWidgets('a Windows pinch keeps what is under the fingers there', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final controller = NodeEditorController(graph: NodeGraph());
+    addTearDown(controller.dispose);
+
+    // Not at the window's corner, as under an app's toolbar: the transform
+    // is the window's, the camera the editor's.
+    const origin = Offset(100, 50);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Padding(
+          padding: EdgeInsets.only(left: origin.dx, top: origin.dy),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 800,
+              height: 600,
+              child: NodeEditor(
+                controller: controller,
+                theme: NodeEditorTheme.dark(),
+                nodeBuilder: (context, graphNode, state) =>
+                    const ColoredBox(color: Color(0xFF2A2E38)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Future<void> pinch(double s, Offset drift) async {
+      const cursor = Offset(150, 120);
+      const fingers = Offset(500, 350);
+      final trackpad = TestPointer(1, PointerDeviceKind.trackpad);
+      await tester.sendEventToBinding(trackpad.panZoomStart(cursor));
+      await tester.pump();
+      for (var i = 1; i <= 4; i++) {
+        final step = 1 + (s - 1) * i / 4;
+        await tester.sendEventToBinding(
+          trackpad.panZoomUpdate(
+            cursor,
+            pan: fingers * (1 - step) + drift * (i / 4),
+            scale: step,
+          ),
+        );
+        await tester.pump();
+      }
+      await tester.sendEventToBinding(trackpad.panZoomEnd());
+      await tester.pump();
+    }
+
+    final fingers = const Offset(500, 350) - origin;
+    var under = controller.camera.viewport.toScene(fingers);
+    await pinch(1.6, const Offset(20, 10));
+    var now = controller.camera.viewport.toScene(
+      fingers + const Offset(20, 10),
+    );
+    expect(controller.camera.viewport.scale, closeTo(1.6, 0.001));
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+
+    // Past the limit it stops there, still about the fingers.
+    under = controller.camera.viewport.toScene(fingers);
+    await pinch(100, Offset.zero);
+    now = controller.camera.viewport.toScene(fingers);
+    expect(controller.camera.viewport.scale, controller.camera.maxScale);
+    expect(now.dx, closeTo(under.dx, 0.001));
+    expect(now.dy, closeTo(under.dy, 0.001));
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('an unselected node drags immediately, selecting as it goes', (

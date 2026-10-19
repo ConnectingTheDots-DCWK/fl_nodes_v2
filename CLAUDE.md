@@ -203,7 +203,46 @@ gated on `_pointerButtons & kSecondaryButton` instead, following the existing
 real wire.
 
 **A trackpad is two different devices depending on where the app runs.**
-Native desktop sends `PointerPanZoom*`, which `_handlePanZoom*` reads. A
+Native desktop sends `PointerPanZoom*`, which `_handlePanZoom*` reads — and
+**only** they: `ScaleGestureRecognizer` accepts pan-zoom whatever
+`supportedDevices` says (it overrides `isPointerPanZoomAllowed` to `true`), so
+the canvas recogniser heard every swipe as well. That panned twice, and since
+`_handleScaleStart` reads `_pointerDownPosition` — the last *mouse* press — a
+swipe after a click on a handle dragged a wire out of it. `_handleScaleStart`
+blocks a `details.kind == trackpad` gesture. The zoom is pinned at
+`localPosition + localPan`: `localPosition` on an update is where the gesture
+began, not where the fingers are.
+
+**Every drag recogniser over the canvas leaves the trackpad out**:
+`supportedDevices: canvasDragDevices` on the node, the group handle, the
+minimap bar and its grip. Unlike the scale recogniser, a drag recogniser
+*does* honour that set for pan-zoom, and without it a swipe begun over one of
+them was a drag of it. A swipe moves the drag's pointer and the camera
+together, so the card only got selected and a wire from a handle stuck to the
+scene a few pixels off, but a Windows pinch's `pan` carries the zoom's shift
+and threw the card. **Windows hit-tests a pan-zoom at the cursor, not the
+fingers**, so it is where the cursor rests that decides what a gesture lands
+on, and a test has to put it there. A press on the pad still arrives as
+`kind: mouse`, so a click and a click-drag reach all four. A new drag surface
+on the canvas takes the same set.
+
+**Windows sends the same event meaning something else**, and
+`_applyDirectManipulation` is the branch for it — read in the engine,
+`shell/platform/windows/direct_manipulation.cc` and `flutter_windows_view.cc`.
+`pan` is not a finger translation: it is the `t` of DirectManipulation's content
+transform `x ↦ s·x + t`, in window coordinates, whose scale is taken about the
+fingers' centroid — so `t` already holds the `centroid × (1 − s)` a zoom about
+them makes. And `position` is the mouse cursor's, not the fingers'. The
+macOS reading, applied there, zoomed about the cursor *and* added that shift:
+the view jumped by hundreds of pixels per pinch. The branch applies the
+affine as it is to the viewport the gesture began on, shifted by
+`origin × (s − 1)` because the editor's local frame is not the window's; at a
+zoom limit it stops about the affine's fixed point, `shift / (1 − s)`. The
+centroid itself is never known and never needed. One thing the engine does
+that this cannot correct: it resets the content transform only after
+**inertia**, so if a pinch ever ends without passing through it, the next
+gesture's `pan` carries a stale term of `(1 − s) × T₀`. Unseen so far;
+`LOG_POINTERS=true` on the example prints every raw event if it is. A
 browser has no such event, so on the web a trackpad is wheel events, and the
 engine (`pointer_binding.dart`, `_convertWheelEventToPointerData`) sorts them:
 a wheel with `ctrlKey` — which is what a pinch *is* — becomes a
