@@ -17,6 +17,10 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   canvas.** With the cursor resting on one, a swipe or pinch also selected
   or dragged the node, pulled a wire out of the handle, or carried the panel
   away.
+- **A two-finger pinch only zooms, wherever the fingers land.** Over a card
+  it dragged and selected the card; now it zooms about the fingers there as
+  on empty canvas, and a second finger takes back a drag the first had
+  begun.
 
 ## 1.3.0
 

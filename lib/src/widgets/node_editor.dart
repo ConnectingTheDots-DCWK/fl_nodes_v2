@@ -336,6 +336,13 @@ class NodeEditorState extends State<NodeEditor>
   /// point the user clicked.
   Offset? _pointerDownPosition;
 
+  // Two-finger touch state: every touch on the canvas by pointer, local.
+  final Map<int, Offset> _touches = <int, Offset>{};
+  // True from the second finger landing until the last one lifts.
+  bool _touchNavigating = false;
+  // The pinch baseline: the camera, and the two fingers' midpoint and spread.
+  ({ViewportTransform viewport, Offset centroid, double span})? _pinch;
+
   // Trackpad pan/zoom state.
   ViewportTransform _panZoomStart = ViewportTransform.identity;
   Offset _panZoomLastPan = Offset.zero;
@@ -609,6 +616,10 @@ class NodeEditorState extends State<NodeEditor>
   bool get _secondaryPressed => _pointerButtons & kSecondaryButton != 0;
 
   void _handleScaleStart(ScaleStartDetails details) {
+    if (_touchNavigating) {
+      _canvasGesture = _CanvasGesture.blocked;
+      return;
+    }
     // A trackpad's pan-zoom is the `Listener`'s alone (`_handlePanZoom*`).
     // The scale recogniser accepts it too, whatever `supportedDevices` says,
     // and acting on it here panned the camera twice and read the last mouse
@@ -1033,6 +1044,7 @@ class NodeEditorState extends State<NodeEditor>
   // --------------------------------------------------------- node gestures
 
   void _handleNodeTap(GraphNode node, bool additive) {
+    if (_touchNavigating) return;
     // Clicking the node's own chrome takes focus back from anything inside it,
     // so canvas shortcuts apply again.
     _focusNode.requestFocus();
@@ -1049,7 +1061,7 @@ class NodeEditorState extends State<NodeEditor>
     Offset globalPosition,
     bool additive,
   ) {
-    if (_secondaryPressed) return;
+    if (_secondaryPressed || _touchNavigating) return;
     _focusNode.requestFocus();
 
     // The handles painted on this node's border are inside its gesture area,
@@ -1096,6 +1108,7 @@ class NodeEditorState extends State<NodeEditor>
   // -------------------------------------------------------- group gestures
 
   void _handleGroupTap(NodeGroup group, bool additive) {
+    if (_touchNavigating) return;
     _focusNode.requestFocus();
     if (additive) {
       _controller.selection.toggleGroup(group.id);
@@ -1109,7 +1122,7 @@ class NodeEditorState extends State<NodeEditor>
     Offset globalPosition,
     bool additive,
   ) {
-    if (_secondaryPressed) return;
+    if (_secondaryPressed || _touchNavigating) return;
     _focusNode.requestFocus();
     if (!_controller.selection.containsGroup(group.id)) {
       if (additive) {
@@ -1339,7 +1352,7 @@ class NodeEditorState extends State<NodeEditor>
   /// number that happens to equal it, so a card that later loses a row is
   /// free to shrink.
   void _handleNodeResizeStart(GraphNode node, Offset globalPosition) {
-    if (_secondaryPressed) return;
+    if (_secondaryPressed || _touchNavigating) return;
     _focusNode.requestFocus();
     _controller.history.beginTransaction();
     _resize = (
@@ -1390,6 +1403,88 @@ class NodeEditorState extends State<NodeEditor>
     if (_resize == null) return;
     _controller.history.commitTransaction();
     _resize = null;
+  }
+
+  // ------------------------------------------------------ two-finger touch
+
+  // A two-finger touch is the camera's, wherever the fingers land. The canvas
+  // recogniser only hears fingers on empty canvas — a card above it in the
+  // stack takes its own — so two fingers on a card were two drags of the card
+  // and a pinch there threw it. The root `Listener` hears every finger, so it
+  // owns the pinch: the second finger undoes whatever the first one started,
+  // and nothing new starts until the last one lifts.
+  void _handleTouchDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _touches[event.pointer] = event.localPosition;
+    if (_touches.length == 2) _beginPinch();
+  }
+
+  void _handleTouchMove(PointerMoveEvent event) {
+    if (!_touches.containsKey(event.pointer)) return;
+    _touches[event.pointer] = event.localPosition;
+    final pinch = _pinch;
+    if (pinch == null) return;
+    final (:centroid, :span) = _spread();
+    final camera = _controller.camera;
+    final scale = pinch.span == 0
+        ? pinch.viewport.scale
+        : (pinch.viewport.scale * span / pinch.span).clamp(
+            camera.minScale,
+            camera.maxScale,
+          );
+    // What was under the fingers' midpoint stays under it as it travels.
+    final under = pinch.viewport.toScene(pinch.centroid);
+    camera.viewport = ViewportTransform(
+      offset: centroid - under * scale,
+      scale: scale,
+    );
+  }
+
+  void _handleTouchUp(PointerEvent event) {
+    if (_touches.remove(event.pointer) == null) return;
+    // A third finger leaving keeps the pinch; the second ends it, and a
+    // finger set down again starts a fresh one from where the camera is.
+    if (_touches.length < 2) _pinch = null;
+    if (_touches.isEmpty) _touchNavigating = false;
+  }
+
+  ({Offset centroid, double span}) _spread() {
+    final [a, b, ...] = _touches.values.toList();
+    return (centroid: (a + b) / 2, span: (a - b).distance);
+  }
+
+  void _beginPinch() {
+    if (!_touchNavigating) {
+      _touchNavigating = true;
+      _abandonTouchGesture();
+    }
+    final (:centroid, :span) = _spread();
+    _pinch = (viewport: _viewport, centroid: centroid, span: span);
+  }
+
+  /// Takes back whatever the first finger had begun, as if it never had.
+  void _abandonTouchGesture() {
+    _stopEdgeScroll();
+    if (_canvasGesture != _CanvasGesture.none) {
+      _canvasGesture = _CanvasGesture.blocked;
+    }
+    if (_pending != null) _clearPendingConnection();
+    if (_nodeDragOrigin != null) {
+      _controller.history.cancelTransaction();
+      setState(() {
+        _draggingNodeIds = const <String>{};
+        _nodeDragOrigin = null;
+        _nodeDragStartPositions = const <String, Offset>{};
+      });
+    }
+    if (_draggingWaypoint != null) {
+      _controller.history.cancelTransaction();
+      setState(() => _draggingWaypoint = null);
+    }
+    if (_resize != null) {
+      _controller.history.cancelTransaction();
+      _resize = null;
+    }
   }
 
   // --------------------------------------------------- connection gestures
@@ -1928,7 +2023,11 @@ class NodeEditorState extends State<NodeEditor>
           _pointerButtons = event.buttons;
           _pointerKind = event.kind;
           _pointerDownPosition = event.localPosition;
+          _handleTouchDown(event);
         },
+        onPointerMove: _handleTouchMove,
+        onPointerUp: _handleTouchUp,
+        onPointerCancel: _handleTouchUp,
         onPointerSignal: _handlePointerSignal,
         onPointerPanZoomStart: _handlePanZoomStart,
         onPointerPanZoomUpdate: _handlePanZoomUpdate,
