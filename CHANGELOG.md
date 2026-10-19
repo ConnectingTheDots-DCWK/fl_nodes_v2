@@ -3,7 +3,12 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
-## Unreleased
+## 1.3.1
+
+Trackpads and touch screens that move the canvas the way the fingers do:
+one pan for one swipe, a pinch that zooms about the fingers on every
+platform, and nothing under the cursor or the fingers selected or dragged
+along the way. No API changes.
 
 ### Fixed
 
