@@ -198,16 +198,12 @@ class _Handles {
     required Path fillPath,
     required Path strokePath,
   }) {
-    _fills[fill] = Path.combine(
-      PathOperation.union,
-      _fills[fill] ?? Path(),
-      fillPath,
-    );
-    _strokes[stroke] = Path.combine(
-      PathOperation.union,
-      _strokes[stroke] ?? Path(),
-      strokePath,
-    );
+    // Appended, never `Path.combine`d: a union is a boolean operation
+    // against everything merged so far, so per handle it made a frame cost
+    // the square of the handles on screen — 66 ms with 72 nodes in view.
+    // The only thing it bought was one outline where two handles overlap.
+    (_fills[fill] ??= Path()).addPath(fillPath, Offset.zero);
+    (_strokes[stroke] ??= Path()).addPath(strokePath, Offset.zero);
   }
 
   void draw(Canvas canvas, double border) {

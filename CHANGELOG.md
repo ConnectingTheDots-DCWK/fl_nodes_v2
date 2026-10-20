@@ -3,6 +3,15 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## Unreleased
+
+### Fixed
+
+- **Panning and zooming no longer slow down with the number of handles on
+  screen.** A frame cost the square of the ports in view: about 66 ms with
+  70 nodes showing and over half a second with 170, between 25% zoom and
+  100%.
+
 ## 1.3.1
 
 Trackpads and touch screens that move the canvas the way the fingers do:

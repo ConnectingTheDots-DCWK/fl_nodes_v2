@@ -1,3 +1,5 @@
+import 'dart:ui' show PictureRecorder;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
@@ -155,6 +157,46 @@ void main() {
           'this is the whole point of painting handles: crossing the level of '
           'detail threshold must not touch the widget tree, or it stutters '
           'exactly where the user is already moving',
+    );
+  });
+
+  // Handles are batched into one path per colour, and that batch used to be
+  // grown with `Path.combine(union, …)`: a boolean operation against
+  // everything merged so far, per handle, so a frame cost the square of the
+  // handles on screen. It was 66 ms of UI thread a frame with 72 nodes in
+  // view, and eight seconds with 600, from 0.5.0 until 1.3.2. The bound is
+  // a hundred times what the linear version takes here, and a fraction of
+  // what the quadratic one did.
+  test('a screenful of handles paints in time linear in their number', () {
+    final nodes = <GraphNode>[
+      for (var i = 0; i < 400; i++)
+        node('n$i', Offset((i % 20) * 200.0, (i ~/ 20) * 120.0)),
+    ];
+    PortsPainter painter() => PortsPainter(
+      nodes: nodes,
+      sizeOf: (node) => Size(node.width, node.height ?? 90),
+      connectedPorts: const <String, Set<String>>{},
+      viewport: ViewportTransform.identity,
+      theme: theme,
+      revision: 0,
+      selectionRevision: 0,
+      coversOf: (_) => const <Rect>[],
+    );
+    void paintOnce() {
+      final recorder = PictureRecorder();
+      painter().paint(Canvas(recorder), const Size(1600, 900));
+      recorder.endRecording().dispose();
+    }
+
+    paintOnce(); // warm-up: JIT, and the shape paths
+    final watch = Stopwatch()..start();
+    paintOnce();
+    expect(
+      watch.elapsedMilliseconds,
+      lessThan(250),
+      reason:
+          'eight hundred handles have to cost a pass over them, not a '
+          'boolean path operation against every handle merged before',
     );
   });
 }
