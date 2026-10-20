@@ -146,7 +146,14 @@ export 'src/painting/connection_layout.dart'
 export 'src/painting/connections_painter.dart' show ConnectionsPainter;
 export 'src/painting/emphasis_painter.dart' show EmphasisPainter;
 export 'src/painting/node_sketch.dart'
-    show NodeSketch, NodeSketcher, SketchBar, SketchBox, SketchPart, SketchText;
+    show
+        NodeSketch,
+        NodeSketcher,
+        NodeSketches,
+        SketchBar,
+        SketchBox,
+        SketchPart,
+        SketchText;
 export 'src/painting/grid_painter.dart' show GridPainter;
 export 'src/painting/port_shape.dart' show PortShape;
 export 'src/painting/grid_shader.dart' show GridShader;

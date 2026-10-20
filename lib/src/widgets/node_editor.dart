@@ -5,7 +5,7 @@ import 'dart:ui' show FragmentShader;
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:flutter/scheduler.dart' show SchedulerBinding, Ticker;
 import 'package:flutter/services.dart';
 
 import '../controller/node_editor_controller.dart';
@@ -25,8 +25,11 @@ import '../painting/connections_painter.dart';
 import '../painting/emphasis_painter.dart';
 import '../painting/grid_painter.dart';
 import '../painting/grid_shader.dart';
+import '../painting/node_sketch.dart';
 import '../painting/overlay_painter.dart';
 import '../painting/ports_painter.dart';
+import '../painting/sketch_cache.dart';
+import '../painting/sketch_painter.dart';
 import '../l10n/node_editor_localizations.dart';
 import '../menus/node_editor_menu_host.dart';
 import '../menus/node_editor_menus.dart';
@@ -103,6 +106,7 @@ class NodeEditor extends StatefulWidget {
     this.edgeScroll = const EdgeScrollConfig(),
     this.minimap,
     this.minimapController,
+    this.sketches,
   });
 
   final NodeEditorController controller;
@@ -236,16 +240,28 @@ class NodeEditor extends StatefulWidget {
   /// supplied controller is the host's to dispose.
   final MinimapController? minimapController;
 
+  /// Level of detail, or null to build every node as a widget at every zoom.
+  ///
+  /// Off by default, like [minimap]: zoomed out past [NodeSketches.below],
+  /// each node is drawn from the sketch the host describes instead of being
+  /// built, and a host has to say what its nodes look like for that to mean
+  /// anything. A node being dragged or resized, or holding the keyboard
+  /// focus, stays built whatever the zoom.
+  final NodeSketches? sketches;
+
   @override
   State<NodeEditor> createState() => NodeEditorState();
 }
 
 /// What the current press on the canvas turned out to mean.
 ///
+/// [node] is a press on a sketched node, which has no widget of its own to
+/// catch it: the canvas moves the selection on the node's behalf.
+///
 /// [blocked] is a press that must not become a drag at all — a secondary
 /// press, which opens a menu instead. It needs its own state rather than
 /// simply staying [none], because [none] falls through to panning.
-enum _CanvasGesture { none, pan, marquee, port, waypoint, blocked }
+enum _CanvasGesture { none, pan, marquee, port, waypoint, node, blocked }
 
 class NodeEditorState extends State<NodeEditor>
     with SingleTickerProviderStateMixin {
@@ -406,6 +422,37 @@ class NodeEditorState extends State<NodeEditor>
   /// Scene-space connection paths, rebuilt only when the graph moves.
   final ConnectionLayout _connections = ConnectionLayout();
 
+  /// Every node's sketch, laid out once and kept until it could be stale.
+  final SketchCache _sketches = SketchCache();
+
+  /// Whether the zoom is past [NodeSketches.below], with the hysteresis that
+  /// stops a zoom settling on the line from flickering between the two.
+  bool _sketching = false;
+
+  /// The listenable [NodeSketches.refresh] is subscribed through.
+  Listenable? _sketchRefresh;
+
+  /// The notes' sketch, held per canvas colour for the reason
+  /// [_commentBuilder] is held: the cache compares sketchers by identity.
+  NodeSketcher? _commentSketcher;
+  Color? _commentSketcherBackground;
+
+  /// Either side of [NodeSketches.below], in zoom, before the switch is made.
+  static const double _sketchHysteresis = 0.03;
+
+  /// How long a frame may spend laying out sketches. Laying one out is the
+  /// engine's text layout — about a tenth of a millisecond for a card with a
+  /// paragraph on it — so a screenful at once is a visible stall, and this
+  /// spreads it over frames. A node whose sketch is not ready stays built.
+  static const Duration _sketchBudget = Duration(milliseconds: 4);
+
+  /// How far above [NodeSketches.below] sketches start being laid out
+  /// ahead of the switch, as a multiple of it: a zoom heading out has its
+  /// sketches ready by the time it gets there.
+  static const double _sketchPrewarm = 1.6;
+
+  bool _sketchFramePending = false;
+
   NodeEditorController get _controller => widget.controller;
   ViewportTransform get _viewport => _controller.camera.viewport;
   NodeEditorTheme get _theme => _resolvedTheme!;
@@ -423,6 +470,19 @@ class NodeEditorState extends State<NodeEditor>
     // element is already deactivated and the lookup asserts.
     _edgeScrollTicker = createTicker(_handleEdgeScrollTick);
     _loadGridShader();
+    _subscribeSketchRefresh();
+  }
+
+  void _subscribeSketchRefresh() {
+    final refresh = widget.sketches?.refresh;
+    if (identical(refresh, _sketchRefresh)) return;
+    _sketchRefresh?.removeListener(_handleSketchRefresh);
+    _sketchRefresh = refresh?..addListener(_handleSketchRefresh);
+  }
+
+  void _handleSketchRefresh() {
+    _sketches.clear();
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadGridShader() async {
@@ -451,6 +511,7 @@ class NodeEditorState extends State<NodeEditor>
       _connectedPortsSource = null;
       _connectedPortsCache = const <String, Set<String>>{};
       _connections.invalidate();
+      _sketches.clear();
       // And it has never been told the grid: `_resolveTheme` is skipped above
       // whenever the theme itself did not change, which is most swaps.
       _controller.reportGridStep(_theme.gridSpacing);
@@ -461,6 +522,7 @@ class NodeEditorState extends State<NodeEditor>
       _ownedMinimap!.dispose();
       _ownedMinimap = null;
     }
+    _subscribeSketchRefresh();
   }
 
   /// Cached so painters can compare themes by identity and skip repaints.
@@ -492,6 +554,7 @@ class NodeEditorState extends State<NodeEditor>
     // Before the mixin's own dispose, which asserts that nothing is ticking.
     _edgeScrollTicker.dispose();
     _gridShader?.dispose();
+    _sketchRefresh?.removeListener(_handleSketchRefresh);
     _focusNode.dispose();
     // Only ever the one made here: a host's controller outlives its editor.
     _ownedMinimap?.dispose();
@@ -669,6 +732,22 @@ class NodeEditorState extends State<NodeEditor>
         keyboard.isLogicalKeyPressed(LogicalKeyboardKey.space) ||
         details.pointerCount > 1;
 
+    // A sketched node has no widget to catch its own press, so the canvas
+    // moves it — as the node would have, and only where it would have.
+    if (!navigating && details.pointerCount == 1) {
+      final down = _pointerDownPosition ?? details.localFocalPoint;
+      final node = _sketchedNodeAt(_viewport.toScene(down));
+      if (node != null) {
+        _canvasGesture = _CanvasGesture.node;
+        _handleNodeDragStart(
+          node,
+          _canvasBox?.localToGlobal(down) ?? details.focalPoint,
+          _additivePressed,
+        );
+        return;
+      }
+    }
+
     final marquee =
         !navigating && (marqueeIsDefault || keyboard.isShiftPressed);
 
@@ -698,7 +777,8 @@ class NodeEditorState extends State<NodeEditor>
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (_canvasGesture == _CanvasGesture.blocked) return;
     if (_canvasGesture == _CanvasGesture.port ||
-        _canvasGesture == _CanvasGesture.waypoint) {
+        _canvasGesture == _CanvasGesture.waypoint ||
+        _canvasGesture == _CanvasGesture.node) {
       _dragTo(details.localFocalPoint);
       return;
     }
@@ -737,6 +817,11 @@ class NodeEditorState extends State<NodeEditor>
     if (_canvasGesture == _CanvasGesture.waypoint) {
       _canvasGesture = _CanvasGesture.none;
       _handleWaypointDragEnd();
+      return;
+    }
+    if (_canvasGesture == _CanvasGesture.node) {
+      _canvasGesture = _CanvasGesture.none;
+      _handleNodeDragEnd();
       return;
     }
     // Selection was already applied live; ending only clears the overlay.
@@ -865,6 +950,15 @@ class NodeEditorState extends State<NodeEditor>
     _lastCanvasTap = doubled ? null : (at: now, local: details.localPosition);
 
     final scene = _viewport.toScene(details.localPosition);
+
+    // A sketch is on top of the wires as its card would be, and selects and
+    // double-taps as the card does — see `NodeView._handleTap`.
+    final sketched = _sketchedNodeAt(scene);
+    if (sketched != null) {
+      _handleNodeTap(sketched, _additivePressed);
+      if (doubled) widget.onNodeDoubleTap?.call(sketched);
+      return;
+    }
 
     // A handle before its wire, or the wire would take every tap on one.
     // Double-clicked, it goes; single-clicked, its wire is selected.
@@ -2082,13 +2176,22 @@ class NodeEditorState extends State<NodeEditor>
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapUp: _handleCanvasTapUp,
-                  onSecondaryTapUp: (details) =>
-                      _handleSecondaryTap(details.globalPosition),
+                  onSecondaryTapUp: (details) => _handleSecondaryTap(
+                    details.globalPosition,
+                    onNode: _sketchedNodeAt(_toScene(details.globalPosition)),
+                  ),
                   onScaleStart: _handleScaleStart,
                   onScaleUpdate: _handleScaleUpdate,
                   onScaleEnd: _handleScaleEnd,
                 ),
-                _buildNodeLayer(size, viewport, theme, drawn, groups),
+                _buildNodeLayer(
+                  size,
+                  viewport,
+                  theme,
+                  drawn,
+                  groups,
+                  _chooseSketched(drawn, viewport.scale),
+                ),
                 // Above the nodes: a handle sits on its node's border and has
                 // to read over its own card and over any card beneath it. A
                 // card painted over the node covers its handles too — they
@@ -2183,6 +2286,7 @@ class NodeEditorState extends State<NodeEditor>
     NodeEditorTheme theme,
     List<GraphNode> drawn,
     List<(NodeGroup, Rect)> groups,
+    Set<String> sketched,
   ) {
     final origin = viewport.visibleSceneRect(size).topLeft;
     final generation = ++_slotGeneration;
@@ -2218,75 +2322,124 @@ class NodeEditorState extends State<NodeEditor>
         ? -1
         : drawn.indexWhere((node) => lifted.contains(node.id));
 
+    Widget emphasisLayer() => Positioned.fill(
+      child: IgnorePointer(
+        child: CustomPaint(
+          painter: EmphasisPainter(
+            emphasis: _controller.emphasis.value,
+            emphasisRevision: _controller.emphasis.revision,
+            lifted: drawn.sublist(focusAt),
+            sizeOf: _controller.layout.sizeOf,
+            connections: _connections,
+            origin: origin,
+            scale: viewport.scale,
+            theme: theme,
+            revision: _controller.revision,
+            graph: _controller.graph,
+            appearance: widget.connectionAppearance,
+          ),
+        ),
+      ),
+    );
+
+    Widget groupLayer(NodeGroup group, Rect frame) => Positioned(
+      key: ValueKey<String>('group:${group.id}'),
+      left: frame.left - origin.dx,
+      top: frame.top - origin.dy,
+      width: frame.width,
+      height: frame.height,
+      child: GroupView(
+        group: group,
+        theme: theme,
+        isSelected: _controller.selection.containsGroup(group.id),
+        onTap: (additive) => _handleGroupTap(group, additive),
+        onSecondaryTap: (at) => _handleGroupSecondaryTap(group, at),
+        onRename: () => _renameGroup(group),
+        onColorPicked: (color) => _controller.setGroupColor(group.id, color),
+        onDragStart: (at, additive) =>
+            _handleGroupDragStart(group, at, additive),
+        onDragUpdate: _handleNodeDragUpdate,
+        onDragEnd: _handleNodeDragEnd,
+      ),
+    );
+
+    Widget nodeLayer(GraphNode node) {
+      final slot = _slots.putIfAbsent(node.id, () => _NodeSlot(this, node.id));
+      slot.generation = generation;
+      return Positioned(
+        // The key belongs on the Stack's direct child. Paint order
+        // reorders this list whenever the selection changes, and an
+        // unkeyed Positioned would be matched by slot — rebuilding
+        // the node beneath it from scratch, destroying its state and
+        // cancelling any gesture it was in the middle of.
+        key: slot.key,
+        left: node.position.dx - origin.dx,
+        top: node.position.dy - origin.dy,
+        child: slot.build(node, theme, connected[node.id] ?? _noPorts),
+      );
+    }
+
     final children = <Widget>[];
-    for (var index = 0; index <= drawn.length; index++) {
-      if (index == focusAt) {
-        children.add(
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: EmphasisPainter(
-                  emphasis: _controller.emphasis.value,
-                  emphasisRevision: _controller.emphasis.revision,
-                  lifted: drawn.sublist(focusAt),
-                  sizeOf: _controller.layout.sizeOf,
-                  connections: _connections,
-                  origin: origin,
-                  scale: viewport.scale,
-                  theme: theme,
-                  revision: _controller.revision,
-                  graph: _controller.graph,
-                  appearance: widget.connectionAppearance,
+    if (sketched.isEmpty) {
+      for (var index = 0; index <= drawn.length; index++) {
+        if (index == focusAt) children.add(emphasisLayer());
+        for (final (group, frame)
+            in under[index] ?? const <(NodeGroup, Rect)>[]) {
+          children.add(groupLayer(group, frame));
+        }
+        if (index == drawn.length) break;
+        children.add(nodeLayer(drawn[index]));
+      }
+    } else {
+      // Frames first and all together: a sketch is one layer for every node
+      // it draws, so there is no slot between two of them to put a frame in,
+      // and a frame painted over the sketches would hide its own members.
+      for (final entry in groups) {
+        children.add(groupLayer(entry.$1, entry.$2));
+      }
+      // Below the scrim and above it, each band its sketches and then the
+      // nodes still built — one dragged, one being typed in — over them.
+      void band(List<GraphNode> nodes, String name) {
+        final painted = <GraphNode>[
+          for (final node in nodes)
+            if (sketched.contains(node.id)) node,
+        ];
+        if (painted.isNotEmpty) {
+          children.add(
+            Positioned.fill(
+              key: ValueKey<String>('sketches:$name'),
+              // A painter with no child claims every press inside it; the
+              // canvas underneath is what answers a press on a sketch.
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: SketchPainter(
+                    nodes: painted,
+                    sketchOf: _sketchOfNode,
+                    origin: origin,
+                    scale: viewport.scale,
+                    theme: theme,
+                    revision: _controller.revision,
+                    selectionRevision: _controller.selection.revision,
+                    selected: _controller.selection.nodeIds,
+                    target: _pendingTarget?.nodeId,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
+          );
+        }
+        for (final node in nodes) {
+          if (!sketched.contains(node.id)) children.add(nodeLayer(node));
+        }
       }
-      for (final (group, frame)
-          in under[index] ?? const <(NodeGroup, Rect)>[]) {
-        children.add(
-          Positioned(
-            key: ValueKey<String>('group:${group.id}'),
-            left: frame.left - origin.dx,
-            top: frame.top - origin.dy,
-            width: frame.width,
-            height: frame.height,
-            child: GroupView(
-              group: group,
-              theme: theme,
-              isSelected: _controller.selection.containsGroup(group.id),
-              onTap: (additive) => _handleGroupTap(group, additive),
-              onSecondaryTap: (at) => _handleGroupSecondaryTap(group, at),
-              onRename: () => _renameGroup(group),
-              onColorPicked: (color) =>
-                  _controller.setGroupColor(group.id, color),
-              onDragStart: (at, additive) =>
-                  _handleGroupDragStart(group, at, additive),
-              onDragUpdate: _handleNodeDragUpdate,
-              onDragEnd: _handleNodeDragEnd,
-            ),
-          ),
-        );
-      }
-      if (index == drawn.length) break;
 
-      final node = drawn[index];
-      final slot = _slots.putIfAbsent(node.id, () => _NodeSlot(this, node.id));
-      slot.generation = generation;
-      children.add(
-        Positioned(
-          // The key belongs on the Stack's direct child. Paint order
-          // reorders this list whenever the selection changes, and an
-          // unkeyed Positioned would be matched by slot — rebuilding
-          // the node beneath it from scratch, destroying its state and
-          // cancelling any gesture it was in the middle of.
-          key: slot.key,
-          left: node.position.dx - origin.dx,
-          top: node.position.dy - origin.dy,
-          child: slot.build(node, theme, connected[node.id] ?? _noPorts),
-        ),
-      );
+      if (focusAt < 0) {
+        band(drawn, 'all');
+      } else {
+        band(drawn.sublist(0, focusAt), 'below');
+        children.add(emphasisLayer());
+        band(drawn.sublist(focusAt), 'lifted');
+      }
     }
     _slots.removeWhere((_, slot) => slot.generation != generation);
 
@@ -2307,6 +2460,108 @@ class NodeEditorState extends State<NodeEditor>
         ),
       ),
     );
+  }
+
+  // ----------------------------------------------------------- sketches
+
+  /// The function a node is sketched by: the host's, or the notes' own.
+  NodeSketcher _sketcherFor(GraphNode node, NodeSketches config) {
+    if (!NodeComment.isComment(node)) return config.sketch;
+    final background = _theme.background;
+    if (_commentSketcherBackground != background) {
+      _commentSketcherBackground = background;
+      _commentSketcher = (node, size) => commentSketch(node, size, background);
+    }
+    return _commentSketcher!;
+  }
+
+  /// Handed to every [SketchPainter], so it is torn off once: the painter
+  /// compares it by identity to decide whether to repaint.
+  late final ResolvedSketch Function(GraphNode node) _sketchOfNode = _sketchOf;
+
+  ResolvedSketch _sketchOf(GraphNode node) => _sketches.resolve(
+    node,
+    _controller.layout.sizeOf(node),
+    _sketcherFor(node, widget.sketches!),
+  );
+
+  /// Which of [drawn] are sketched this frame, rather than built.
+  ///
+  /// Moves the switch first, with its hysteresis. Then lays out as many
+  /// missing sketches as [_sketchBudget] allows — from [_sketchPrewarm]
+  /// times the threshold down, so a zoom heading out finds them ready — and
+  /// sketches only the nodes whose sketch is ready, so one that is still
+  /// waiting stays built rather than disappearing for a frame.
+  Set<String> _chooseSketched(List<GraphNode> drawn, double scale) {
+    final config = widget.sketches;
+    if (config == null) {
+      _sketching = false;
+      return const <String>{};
+    }
+    if (_sketching
+        ? scale > config.below + _sketchHysteresis
+        : scale < config.below - _sketchHysteresis) {
+      _sketching = !_sketching;
+    }
+    if (!_sketching && scale >= config.below * _sketchPrewarm) {
+      return const <String>{};
+    }
+
+    _sketches.prune(_controller.graph.nodes);
+    final pinned = _sketching ? _pinnedNodeIds() : const <String>{};
+    final chosen = <String>{};
+    final clock = Stopwatch()..start();
+    var waiting = false;
+    for (final node in drawn) {
+      if (pinned.contains(node.id)) continue;
+      final size = _controller.layout.sizeOf(node);
+      final sketcher = _sketcherFor(node, config);
+      if (!_sketches.isReady(node, size, sketcher)) {
+        if (clock.elapsed >= _sketchBudget) {
+          waiting = true;
+          continue;
+        }
+        _sketches.resolve(node, size, sketcher);
+      }
+      if (_sketching) chosen.add(node.id);
+    }
+    if (waiting) _scheduleSketchFrame();
+    return chosen;
+  }
+
+  /// Another frame for the sketches this one ran out of time for. Nothing
+  /// else would ask for one: a zoom that has stopped produces no frames.
+  void _scheduleSketchFrame() {
+    if (_sketchFramePending) return;
+    _sketchFramePending = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _sketchFramePending = false;
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Nodes that stay built at any zoom: unmounting one would end the drag or
+  /// the resize it is in the middle of, or throw away a half-typed field.
+  Set<String> _pinnedNodeIds() => <String>{
+    ..._draggingNodeIds,
+    if (_resize?.id case final String id) id,
+    if (_focusedNodeId() case final String id) id,
+  };
+
+  /// The node whose body holds the keyboard focus, if one does.
+  String? _focusedNodeId() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context == null || !context.mounted) return null;
+    return context.findAncestorWidgetOfExactType<NodeView>()?.node.id;
+  }
+
+  /// The node under [scenePoint] if it is drawn as a sketch: it has no widget
+  /// to catch a press, so the canvas acts for it.
+  GraphNode? _sketchedNodeAt(Offset scenePoint) {
+    if (widget.sketches == null) return null;
+    final node = _nodeAt(scenePoint);
+    if (node == null || _slots.containsKey(node.id)) return null;
+    return node;
   }
 
   /// Which ports currently have a wire on them, for every node at once.

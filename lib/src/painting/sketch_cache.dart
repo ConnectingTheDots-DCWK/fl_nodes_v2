@@ -144,6 +144,15 @@ class SketchCache {
   @visibleForTesting
   int debugResolveCount = 0;
 
+  /// Whether [resolve] would answer without asking [sketcher] anything.
+  bool isReady(GraphNode node, Size size, NodeSketcher sketcher) {
+    final entry = _entries[node.id];
+    return entry != null &&
+        identical(entry.node, node) &&
+        identical(entry.sketcher, sketcher) &&
+        entry.resolved.size == size;
+  }
+
   ResolvedSketch resolve(GraphNode node, Size size, NodeSketcher sketcher) {
     final entry = _entries[node.id];
     if (entry != null &&
