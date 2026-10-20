@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 
+import 'bench_tiers.dart';
 import 'sample_graph.dart';
 import 'workflow_node_card.dart';
 
@@ -39,7 +40,16 @@ import 'workflow_node_card.dart';
 /// | `SHADOW` | on | the blurred drop shadow on every card |
 /// | `FRAMES` | 240 | how long to run (`drag` only) |
 /// | `SCENARIO` | drag | `zoom` for the zoom sweep |
-/// | `BODY` | card | `plain` for a flat box per node |
+/// | `BODY` | card | `plain` for a flat box per node, `replica` for [BenchCard] |
+/// | `TEXT`, `BORDER`, `ROUND` | on | `replica`'s text, border and corners |
+/// | `OVERLAY` | none | `atlas`, `card` or `blocks`: one painter draws every node |
+/// | `CAPTURE` | 0.38 | the zoom `OVERLAY=atlas` snapshots were taken at |
+///
+/// `BODY=replica` with one switch off prices that feature of the card. An
+/// `OVERLAY` leaves every body empty and draws the nodes from one painter over
+/// the editor — what a tier below full detail would draw, see
+/// `bench_tiers.dart` — so its raster is that tier's and its build is still
+/// the widget per node.
 const int kNodes = int.fromEnvironment('NODES', defaultValue: 500);
 const int kFrames = int.fromEnvironment('FRAMES', defaultValue: 240);
 const String kGrid = String.fromEnvironment('GRID', defaultValue: 'on');
@@ -49,6 +59,11 @@ const String kScenario = String.fromEnvironment(
   defaultValue: 'drag',
 );
 const String kBody = String.fromEnvironment('BODY', defaultValue: 'card');
+const String kText = String.fromEnvironment('TEXT', defaultValue: 'on');
+const String kBorder = String.fromEnvironment('BORDER', defaultValue: 'on');
+const String kRound = String.fromEnvironment('ROUND', defaultValue: 'on');
+const String kOverlay = String.fromEnvironment('OVERLAY', defaultValue: 'none');
+const String kCapture = String.fromEnvironment('CAPTURE', defaultValue: '0.38');
 
 /// Zoom levels the sweep visits below 100%, and the frames it spends zooming
 /// to each and then panning at it.
@@ -102,6 +117,14 @@ class _BenchPageState extends State<_BenchPage>
   /// of the report it is counted under.
   late final List<(String, VoidCallback)> _sweep = _buildSweep();
 
+  late final Tier? _tier = switch (kOverlay) {
+    'atlas' => Tier.atlas,
+    'card' => Tier.card,
+    'blocks' => Tier.blocks,
+    _ => null,
+  };
+  SnapshotAtlas? _atlas;
+
   /// Engine frame number -> report row, so timings that arrive in batches
   /// after the fact are still counted under the step that drew them.
   final Map<int, String> _rowOf = <int, String>{};
@@ -132,6 +155,15 @@ class _BenchPageState extends State<_BenchPage>
       // sweep long enough to maximise the window first (see the doc above).
       Future<void>.delayed(Duration(milliseconds: kSettleMs), () {
         if (!mounted) return;
+        if (_tier == Tier.atlas) {
+          setState(() {
+            _atlas = SnapshotAtlas.build(
+              count: math.min(kNodes, 3000),
+              captureScale: double.parse(kCapture),
+              devicePixelRatio: View.of(context).devicePixelRatio,
+            );
+          });
+        }
         // Centred only now, against the window as it ended up.
         if (kMode == 'full' && kScenario == 'zoom') {
           _controller.camera.centerOn(
@@ -255,7 +287,10 @@ class _BenchPageState extends State<_BenchPage>
       'window ${view.physicalSize.width.toInt()}x'
       '${view.physicalSize.height.toInt()} physical, '
       'dpr ${view.devicePixelRatio}\n'
-      '$kNodes nodes, body $kBody, grid $kGrid, shadow $kShadow\n'
+      '$kNodes nodes, body ${_tier == null ? kBody : 'empty'}, '
+      'overlay $kOverlay${_tier == Tier.atlas ? ' at $kCapture, '
+                '${_atlas?.pages.length} pages' : ''}, grid $kGrid, '
+      'shadow $kShadow, text $kText, border $kBorder, round $kRound\n'
       'ms per frame               drawn  build p50/p90  raster p50/p90  frames\n'
       '${rows.join('\n')}',
     );
@@ -313,20 +348,47 @@ class _BenchPageState extends State<_BenchPage>
         ),
       );
     }
+    final editor = NodeEditor(
+      key: _editorKey,
+      controller: _controller,
+      theme: _theme,
+      nodeBuilder: (context, node, state) => switch (kBody) {
+        _ when _tier != null => const SizedBox.expand(),
+        'plain' => const ColoredBox(color: Color(0xFF2A2F3A)),
+        'replica' => BenchCard(
+          node: node,
+          text: kText == 'on',
+          border: kBorder == 'on',
+          round: kRound == 'on',
+          shadow: kShadow == 'on',
+        ),
+        _ => WorkflowNodeCard(
+          node: node,
+          state: state,
+          isDark: true,
+          shadow: kShadow == 'on',
+        ),
+      },
+    );
+    final tier = _tier;
     return Scaffold(
-      body: NodeEditor(
-        key: _editorKey,
-        controller: _controller,
-        theme: _theme,
-        nodeBuilder: (context, node, state) => kBody == 'plain'
-            ? const ColoredBox(color: Color(0xFF2A2F3A))
-            : WorkflowNodeCard(
-                node: node,
-                state: state,
-                isDark: true,
-                shadow: kShadow == 'on',
-              ),
-      ),
+      body: tier == null || (tier == Tier.atlas && _atlas == null)
+          ? editor
+          : Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                editor,
+                IgnorePointer(
+                  child: CustomPaint(
+                    painter: TierPainter(
+                      controller: _controller,
+                      tier: tier,
+                      atlas: _atlas,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

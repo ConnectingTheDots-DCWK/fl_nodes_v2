@@ -1261,6 +1261,27 @@ What it says:
   flat-box raster (11 ms at 2592) are what an overview drawn by one painter,
   with no widget per node, would remove.
 
+**What each feature of the card costs, and what one painter costs instead**
+— the same sweep, raster p50 while panning, with `BODY=replica` (the card
+rebuilt with each feature behind a switch) and `OVERLAY=` (every body empty,
+the nodes drawn by one painter over the editor; `example/lib/bench_tiers.dart`):
+
+| drawn | card | − text | − border | − shadow | − corners | − all four | snapshot | painted card | blocks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 986 | 17.4 | 12.8 | 14.6 | 13.7 | 16.6 | 6.7 | 5.4 | 5.8 | 4.9 |
+| 2592 | 47.2 | 27.6 | 35.8 | 37.5 | 46.0 | 12.4 | 10.2 | 10.0 | 7.7 |
+
+- **Text is the largest part of a card**, about two fifths; then the border
+  and the shadow, a fifth each. Corners cost nothing worth removing — keep
+  them until they are too small to see.
+- **Once one painter draws the nodes, detail is nearly free.** A snapshot of
+  the card (`drawAtlas` over two texture pages), a painted card with corners,
+  border, header and bars, and flat blocks are within 2.5 ms of each other at
+  2592 nodes — and all three still carry the empty widget per node under
+  them. So the steps between full detail and blocks can be as gradual as the
+  eye wants: what costs is the widget per node and real glyphs, not how much
+  of the card a painter draws.
+
 ## Known costs
 
 - `NodeGraph.putNodes` copies the immutable node map: ~390 us per frame while
