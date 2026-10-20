@@ -625,6 +625,56 @@ The panel's placement, size, folded state and settings live on a
 `MinimapController`. The editor makes one when you supply none; own one to
 persist where the panel was left.
 
+### Level of detail
+
+Zoomed out far enough, a board is hundreds or thousands of cards, and building
+each one as a widget is what makes it stutter. Give the editor a **sketch** of
+your node and, past a zoom you choose, it draws every node from its sketch in
+one pass instead. Off by default:
+
+```dart
+NodeSketch sketchCard(GraphNode node, Size size) => NodeSketch(
+  fill: const Color(0xFF232733),
+  radius: const BorderRadius.all(Radius.circular(8)),
+  border: const Color(0xFF32384A),
+  parts: <SketchPart>[
+    SketchBox(Rect.fromLTWH(0, 0, size.width, 36), const Color(0xFF2E3A55)),
+    SketchText(
+      Rect.fromLTWH(12, 0, size.width - 24, 36),
+      node.title,
+      const TextStyle(fontSize: 13, color: Color(0xFFE6E9F0)),
+    ),
+  ],
+);
+
+NodeEditor(
+  controller: controller,
+  nodeBuilder: buildCard,
+  sketches: const NodeSketches(sketch: sketchCard), // below: 0.25
+)
+```
+
+**You describe, the package draws.** A sketch is boxes, bars and text in the
+node's own coordinates, laid out the way your card is. Text is handed over as
+text: the editor lays it out with your style and draws a bar where each line
+would be, so the sketch lines up with the card it stands in for and the switch
+is hard to see. Past the switch, each part fades out by itself once it is too
+small to see, so a card thins down to a block as you keep zooming.
+
+- **Sketches are cached per node.** Pass the same function on every build. If
+  a sketch reads anything besides its node — a file the card previews, a
+  status it shows — give `NodeSketches.refresh` a `Listenable` that fires when
+  that changes.
+- **What stays a widget at any zoom:** a node being dragged or resized, and
+  one holding the keyboard focus.
+- **A sketch still takes presses**: a tap selects, a drag moves, a right click
+  opens the node's menu, and a double tap reaches `onNodeDoubleTap`.
+- **Coming back in, cards are built a few a frame**
+  (`NodeSketches.mountsPerFrame`, 48), nearest the middle first, with their
+  sketches standing in. Lower it if your cards are expensive to build.
+
+Notes are sketched by the editor itself.
+
 ### Snapping
 
 ```dart

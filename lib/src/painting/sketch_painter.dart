@@ -12,7 +12,18 @@ import 'sketch_cache.dart';
 const double sketchFlatBelow = 3;
 
 /// Below this many screen pixels a box or a bar is not drawn.
-const double sketchPartBelow = 1.5;
+const double sketchPartBelow = 0.3;
+
+/// Below this many screen pixels a box or a bar is drawn this thick instead,
+/// and fainter by as much as it was thinner.
+///
+/// Its tone is what is left of a line of text at that size, and dropping it
+/// at a pixel and a half took the text off a card at the very zoom the card
+/// stopped being built — the one step this is meant not to have. Drawn at
+/// its own thickness it would not do either: triangles are not
+/// anti-aliased, so a bar under a pixel lights a row or none depending on
+/// where it falls, and flickers as the canvas pans.
+const double sketchThinBelow = 1;
 
 /// Below this many screen pixels a border is not drawn.
 const double sketchBorderBelow = 0.5;
@@ -47,15 +58,38 @@ void visitSketchAt(
     return;
   }
   for (final shape in sketch.shapes) {
-    final cutoff = shape.ring > 0 ? sketchBorderBelow : sketchPartBelow;
-    if (shape.extent * scale < cutoff) continue;
+    final pixels = shape.extent * scale;
+    final radius = shape.corner * scale < sketchCornerBelow
+        ? BorderRadius.zero
+        : shape.radius;
+    if (shape.ring > 0) {
+      if (pixels >= sketchBorderBelow) {
+        draw(shape.rect, radius, shape.ring, shape.color);
+      }
+      continue;
+    }
+    if (pixels < sketchPartBelow) continue;
+    if (pixels >= sketchThinBelow) {
+      draw(shape.rect, radius, 0, shape.color);
+      continue;
+    }
+    final rect = shape.rect;
+    final thick = sketchThinBelow / scale;
     draw(
-      shape.rect,
-      shape.corner * scale < sketchCornerBelow
-          ? BorderRadius.zero
-          : shape.radius,
-      shape.ring,
-      shape.color,
+      rect.height <= rect.width
+          ? Rect.fromCenter(
+              center: rect.center,
+              width: rect.width,
+              height: thick,
+            )
+          : Rect.fromCenter(
+              center: rect.center,
+              width: thick,
+              height: rect.height,
+            ),
+      BorderRadius.zero,
+      0,
+      shape.color.withValues(alpha: shape.color.a * pixels / sketchThinBelow),
     );
   }
 }
@@ -86,8 +120,8 @@ List<SketchShape> sketchShapesAt(ResolvedSketch sketch, double scale) {
 ///
 /// What is too small to see drops out on its own, part by part: a border
 /// thinner than half a pixel, a corner under a pixel, a box or a line of text
-/// under a pixel and a half, and finally the node itself under three, which
-/// leaves one box in a colour mixed from the card. There is no second look
+/// that has faded out under a third of one, and finally the node itself under
+/// three, which leaves one box in a colour mixed from the card. There is no second look
 /// to switch to, so there is no second threshold.
 class SketchPainter extends CustomPainter {
   SketchPainter({
