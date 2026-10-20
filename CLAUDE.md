@@ -518,9 +518,15 @@ only thing the shape is for. Pointing each one away from its own node was the
 first version and puts two triangles nose to nose on a single wire, saying
 nothing about which way it runs.
 
-The painter still batches by colour, but by `Path.combine` rather than by
-`addOval`, because the shapes differ per port now and a path per colour is
-still a path per colour.
+The painter still batches by colour, now by `addPath` rather than by
+`addOval`, because the shapes differ per port and a path per colour is still
+a path per colour. **Never by `Path.combine`**, which is what this said until
+1.3.2: a union against the batch is a boolean operation against every handle
+merged before, so a frame cost the square of the handles on screen. Profile
+build, 1280x720: 13 ms of UI thread with 30 nodes in view, 66 ms with 72,
+600 ms with 169 — against 0.4, 0.7 and 1.3 with `addPath`. It hid below
+`portMinScale`, where nothing is drawn, so the worst of it sat at the zooms a
+board is actually worked at. `port_lod_test.dart` holds a bound on it.
 
 **`NodeEditor.portTooltip` is a callback and cannot be anything else.** A
 port's `dataType` is a tag the *host* chose — `numberList`, `assetList` — so
