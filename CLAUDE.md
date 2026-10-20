@@ -33,6 +33,7 @@ fvm flutter analyze && fvm flutter test
 cd example && fvm flutter analyze && fvm flutter test
 fvm flutter test benchmark/node_editor_benchmark.dart   # model, 5000 nodes
 fvm flutter test benchmark/widget_benchmark.dart        # one frame of interaction
+fvm flutter test benchmark/zoom_benchmark.dart          # zooming out, level by level
 fvm flutter run -d linux                                # nothing replaces looking
 ```
 
@@ -1224,6 +1225,62 @@ here — the app comes up black with `Failed to create OpenGL context` while
 `FrameTiming` cheerfully reports a fraction of a millisecond for drawing
 nothing. **Do not trust a raster number without checking the run log for that
 warning.**
+
+## Zoomed out
+
+What level of detail is up against, measured before any of it exists —
+`benchmark/zoom_benchmark.dart` for the UI thread's counts, and
+`example/lib/bench.dart` with `SCENARIO=zoom` for both threads in a real
+window (its doc comment has the recipe for a maximised one). Profile build,
+2560x1348 at dpr 1.0 on an RTX 4090, 10,000 nodes, p50 while panning:
+
+| zoom | drawn | build | raster, card | no shadow | flat box |
+| --- | --- | --- | --- | --- | --- |
+| 79% | 99 | 1.0 ms | 4.1 ms | 4.2 ms | 3.5 ms |
+| 49% | 255 | 2.1 ms | 7.7 ms | 6.2 ms | 4.7 ms |
+| 31% | 624 | 3.8 ms | 13.8 ms | 10.4 ms | 6.1 ms |
+| 24% | 986 | 3.2 ms | 17.6 ms | 13.7 ms | 6.2 ms |
+| 19% | 1634 | 4.8 ms | 29.3 ms | 22.5 ms | 9.3 ms |
+| 15% | 2592 | 8.7 ms | 47.2 ms | 37.5 ms | 11.2 ms |
+
+What it says:
+
+- **The cost is on the raster thread, and it is the cards.** The demo card
+  breaks a 60 Hz budget at about a thousand nodes in view; a flat box in its
+  place is four times cheaper at the floor. The shadow is a fifth of the
+  card's cost and the rest is its text and rounded boxes, so a middle tier
+  that only dropped effects would not be enough.
+- **A mounted body costs nothing to zoom.** The counts show every body built,
+  laid out and painted exactly once, when it comes into view: the
+  `RepaintBoundary` per slot holds, and `Transform.scale` moves the layers.
+  Zooming costs what panning does — about 0.6 ms of JIT per body crossing the
+  edge, *in either direction*, since unmounting is not free either.
+- **What is left with flat boxes is the widget per node.** Build is the same
+  for both bodies, because the body is never rebuilt — it is the slots, the
+  `Positioned` children and the layers, about 3 µs a node. That and the
+  flat-box raster (11 ms at 2592) are what an overview drawn by one painter,
+  with no widget per node, would remove.
+
+**What each feature of the card costs, and what one painter costs instead**
+— the same sweep, raster p50 while panning, with `BODY=replica` (the card
+rebuilt with each feature behind a switch) and `OVERLAY=` (every body empty,
+the nodes drawn by one painter over the editor; `example/lib/bench_tiers.dart`):
+
+| drawn | card | − text | − border | − shadow | − corners | − all four | snapshot | painted card | blocks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 986 | 17.4 | 12.8 | 14.6 | 13.7 | 16.6 | 6.7 | 5.4 | 5.8 | 4.9 |
+| 2592 | 47.2 | 27.6 | 35.8 | 37.5 | 46.0 | 12.4 | 10.2 | 10.0 | 7.7 |
+
+- **Text is the largest part of a card**, about two fifths; then the border
+  and the shadow, a fifth each. Corners cost nothing worth removing — keep
+  them until they are too small to see.
+- **Once one painter draws the nodes, detail is nearly free.** A snapshot of
+  the card (`drawAtlas` over two texture pages), a painted card with corners,
+  border, header and bars, and flat blocks are within 2.5 ms of each other at
+  2592 nodes — and all three still carry the empty widget per node under
+  them. So the steps between full detail and blocks can be as gradual as the
+  eye wants: what costs is the widget per node and real glyphs, not how much
+  of the card a painter draws.
 
 ## Known costs
 
