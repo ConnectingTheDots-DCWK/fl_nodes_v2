@@ -4,6 +4,7 @@ import '../controller/node_editor_controller.dart';
 import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
 import '../model/node_comment.dart';
+import '../painting/node_sketch.dart';
 import 'node_editor_scope.dart';
 
 /// The body of a comment note: a text field in a grey slab.
@@ -80,6 +81,32 @@ class _CommentPalette {
 const double _radius = 8;
 const double _padding = 12;
 const double _fontSize = 13;
+const double _lineHeight = 1.35;
+
+/// A note zoomed out, from the same palette and measurements as the
+/// [CommentView] it stands in for — kept beside them so the two cannot drift.
+NodeSketch commentSketch(GraphNode node, Size size, Color background) {
+  final palette = _CommentPalette.forCanvas(background);
+  final text = NodeComment.textOf(node);
+  return NodeSketch(
+    fill: palette.fill,
+    radius: const BorderRadius.all(Radius.circular(_radius)),
+    border: palette.edge,
+    parts: <SketchPart>[
+      if (text.isNotEmpty)
+        SketchText(
+          (Offset.zero & size).deflate(_padding),
+          text,
+          TextStyle(
+            color: palette.ink,
+            fontSize: _fontSize,
+            height: _lineHeight,
+          ),
+          maxLines: null,
+        ),
+    ],
+  );
+}
 
 class _CommentViewState extends State<CommentView> {
   late final TextEditingController _text = TextEditingController(
@@ -146,7 +173,7 @@ class _CommentViewState extends State<CommentView> {
           style: TextStyle(
             color: palette.ink,
             fontSize: _fontSize,
-            height: 1.35,
+            height: _lineHeight,
           ),
           decoration: InputDecoration(
             isDense: true,
