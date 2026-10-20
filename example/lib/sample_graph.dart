@@ -181,9 +181,10 @@ NodeGraph buildSampleGraph() {
 /// index and the connection cache at a scale no hand-authored sample reaches.
 ///
 /// Heights are declared rather than measured, so the graph is fully indexed on
-/// the first frame instead of settling over several.
-NodeGraph buildStressGraph(int count) {
-  const columns = 24;
+/// the first frame instead of settling over several. About `sqrt(count)`
+/// [columns] gives a block a widescreen window can be filled with, which a
+/// zoom-out needs; the default 24 is a tall strip.
+NodeGraph buildStressGraph(int count, {int columns = 24}) {
   const spacing = Offset(320, 190);
 
   final nodes = <GraphNode>[];
