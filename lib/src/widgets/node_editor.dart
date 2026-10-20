@@ -453,6 +453,10 @@ class NodeEditorState extends State<NodeEditor>
 
   bool _sketchFramePending = false;
 
+  /// Whether this controller's nodes have been built once: the first build
+  /// is built whole, since there is nothing on screen yet to stand in.
+  bool _nodesMounted = false;
+
   NodeEditorController get _controller => widget.controller;
   ViewportTransform get _viewport => _controller.camera.viewport;
   NodeEditorTheme get _theme => _resolvedTheme!;
@@ -512,6 +516,7 @@ class NodeEditorState extends State<NodeEditor>
       _connectedPortsCache = const <String, Set<String>>{};
       _connections.invalidate();
       _sketches.clear();
+      _nodesMounted = false;
       // And it has never been told the grid: `_resolveTheme` is skipped above
       // whenever the theme itself did not change, which is most swaps.
       _controller.reportGridStep(_theme.gridSpacing);
@@ -2442,6 +2447,7 @@ class NodeEditorState extends State<NodeEditor>
       }
     }
     _slots.removeWhere((_, slot) => slot.generation != generation);
+    if (drawn.isNotEmpty) _nodesMounted = true;
 
     final visible = viewport.visibleSceneRect(size);
     return ClipRect(
@@ -2487,11 +2493,12 @@ class NodeEditorState extends State<NodeEditor>
 
   /// Which of [drawn] are sketched this frame, rather than built.
   ///
-  /// Moves the switch first, with its hysteresis. Then lays out as many
-  /// missing sketches as [_sketchBudget] allows — from [_sketchPrewarm]
-  /// times the threshold down, so a zoom heading out finds them ready — and
-  /// sketches only the nodes whose sketch is ready, so one that is still
-  /// waiting stays built rather than disappearing for a frame.
+  /// Moves the switch first, with its hysteresis. Past it, every node whose
+  /// sketch is ready is sketched; one still waiting stays built rather than
+  /// disappearing for a frame. Short of it, sketches are laid out ahead of
+  /// time from [_sketchPrewarm] times the threshold down, so a zoom heading
+  /// out finds them ready, and a crowd of nodes arriving at once is built a
+  /// few a frame with its sketches standing in — see [_deferredMounts].
   Set<String> _chooseSketched(List<GraphNode> drawn, double scale) {
     final config = widget.sketches;
     if (config == null) {
@@ -2503,30 +2510,83 @@ class NodeEditorState extends State<NodeEditor>
         : scale < config.below - _sketchHysteresis) {
       _sketching = !_sketching;
     }
-    if (!_sketching && scale >= config.below * _sketchPrewarm) {
-      return const <String>{};
+    _sketches.prune(_controller.graph.nodes);
+    final clock = Stopwatch()..start();
+
+    if (!_sketching) {
+      if (scale < config.below * _sketchPrewarm) {
+        var waiting = false;
+        for (final node in drawn) {
+          if (!_readySketch(node, config, clock)) waiting = true;
+        }
+        if (waiting) _scheduleSketchFrame();
+      }
+      return _deferredMounts(drawn, config, clock);
     }
 
-    _sketches.prune(_controller.graph.nodes);
-    final pinned = _sketching ? _pinnedNodeIds() : const <String>{};
+    final pinned = _pinnedNodeIds();
     final chosen = <String>{};
-    final clock = Stopwatch()..start();
     var waiting = false;
     for (final node in drawn) {
       if (pinned.contains(node.id)) continue;
-      final size = _controller.layout.sizeOf(node);
-      final sketcher = _sketcherFor(node, config);
-      if (!_sketches.isReady(node, size, sketcher)) {
-        if (clock.elapsed >= _sketchBudget) {
-          waiting = true;
-          continue;
-        }
-        _sketches.resolve(node, size, sketcher);
+      if (_readySketch(node, config, clock)) {
+        chosen.add(node.id);
+      } else {
+        waiting = true;
       }
-      if (_sketching) chosen.add(node.id);
     }
     if (waiting) _scheduleSketchFrame();
     return chosen;
+  }
+
+  /// Whether [node]'s sketch is ready, laying it out first if [clock] is
+  /// still inside [_sketchBudget].
+  bool _readySketch(GraphNode node, NodeSketches config, Stopwatch clock) {
+    final size = _controller.layout.sizeOf(node);
+    final sketcher = _sketcherFor(node, config);
+    if (_sketches.isReady(node, size, sketcher)) return true;
+    if (clock.elapsed >= _sketchBudget) return false;
+    _sketches.resolve(node, size, sketcher);
+    return true;
+  }
+
+  /// The nodes about to be built that wait a frame or more, drawn as their
+  /// sketches meanwhile.
+  ///
+  /// Up to [NodeSketches.mountsPerFrame] new nodes are built a frame, the
+  /// nearest the middle of the view first, and the rest wait their turn as
+  /// sketches — which line up with the card they stand for, so what the eye
+  /// sees is text arriving rather than cards appearing. A node with no
+  /// sketch ready and no budget left to lay one out is built at once:
+  /// waiting would mean drawing nothing there at all.
+  ///
+  /// Not on the first build of a document, which has no sketches yet and no
+  /// cards to keep: it is built whole, as it always was.
+  Set<String> _deferredMounts(
+    List<GraphNode> drawn,
+    NodeSketches config,
+    Stopwatch clock,
+  ) {
+    if (!_nodesMounted) return const <String>{};
+    final fresh = <GraphNode>[
+      for (final node in drawn)
+        if (!_slots.containsKey(node.id)) node,
+    ];
+    if (fresh.length <= config.mountsPerFrame) return const <String>{};
+
+    final centre = _viewport.visibleSceneRect(_viewportSize).center;
+    final layout = _controller.layout;
+    double distance(GraphNode node) =>
+        (node.position + layout.sizeOf(node).center(Offset.zero) - centre)
+            .distanceSquared;
+    fresh.sort((a, b) => distance(a).compareTo(distance(b)));
+
+    final deferred = <String>{};
+    for (final node in fresh.skip(config.mountsPerFrame)) {
+      if (_readySketch(node, config, clock)) deferred.add(node.id);
+    }
+    if (deferred.isNotEmpty) _scheduleSketchFrame();
+    return deferred;
   }
 
   /// Another frame for the sketches this one ran out of time for. Nothing

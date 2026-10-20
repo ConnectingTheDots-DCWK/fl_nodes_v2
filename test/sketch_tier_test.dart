@@ -268,6 +268,66 @@ void main() {
     });
   });
 
+  group('coming back in', () {
+    NodeEditorController grid() => controllerOf(<GraphNode>[
+      for (var i = 0; i < 60; i++)
+        node('n$i', Offset((i % 10) * 250.0, (i ~/ 10) * 150.0)),
+    ]);
+    final few = NodeSketches(sketch: card, mountsPerFrame: 10);
+
+    testWidgets('the first build of a board builds it whole', (tester) async {
+      final controller = grid();
+      addTearDown(controller.dispose);
+      zoom(controller, 0.3);
+      await tester.pumpWidget(harness(controller, sketches: few));
+      expect(bodies(tester), 60);
+      expect(sketchPainters(tester), isEmpty);
+    });
+
+    testWidgets('a crowd is built a few a frame, nearest the middle first, '
+        'with sketches standing in for the rest', (tester) async {
+      final controller = grid();
+      addTearDown(controller.dispose);
+      zoom(controller, 0.3);
+      await tester.pumpWidget(harness(controller, sketches: few));
+      zoom(controller, 0.2);
+      await tester.pump();
+      expect(bodies(tester), 0);
+
+      zoom(controller, 0.3);
+      await tester.pump();
+      expect(bodies(tester), 10);
+      final standing = sketchPainters(tester).single.nodes;
+      expect(standing, hasLength(50));
+
+      // The ten built are the ten nearest the middle of the view.
+      final centre = controller.camera.viewport
+          .visibleSceneRect(const Size(800, 600))
+          .center;
+      double distance(GraphNode n) =>
+          (n.position + const Offset(100, 50) - centre).distance;
+      final built = controller.graph.nodes.values
+          .where(
+            (n) => find
+                .byKey(ValueKey<String>('body_${n.id}'))
+                .evaluate()
+                .isNotEmpty,
+          )
+          .map(distance);
+      final waiting = standing.map(distance);
+      expect(
+        built.reduce((a, b) => a > b ? a : b),
+        lessThanOrEqualTo(waiting.reduce((a, b) => a < b ? a : b)),
+      );
+
+      for (var frame = 0; frame < 5; frame++) {
+        await tester.pump();
+      }
+      expect(bodies(tester), 60, reason: 'all of them by the sixth frame');
+      expect(sketchPainters(tester), isEmpty);
+    });
+  });
+
   group('a sketch answers presses', () {
     testWidgets('a tap selects, a double tap reaches the host, a right '
         'click is the node\'s', (tester) async {
