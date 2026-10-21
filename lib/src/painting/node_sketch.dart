@@ -26,7 +26,12 @@ typedef NodeSketcher = NodeSketch Function(GraphNode node, Size size);
 /// zoom falls rather than stepping through a second look.
 @immutable
 class NodeSketches {
-  const NodeSketches({required this.sketch, this.below = 0.25, this.refresh});
+  const NodeSketches({
+    required this.sketch,
+    this.below = 0.25,
+    this.refresh,
+    this.mountsPerFrame = 48,
+  });
 
   /// Pass the same function on every build: sketches are cached against it,
   /// and a new one redraws every sketch — which is also the way to say that
@@ -43,15 +48,25 @@ class NodeSketches {
   /// dropped and asked for again as it is next drawn.
   final Listenable? refresh;
 
+  /// How many nodes may be built in one frame while their sketches stand in
+  /// for the rest — nearest the middle of the view first.
+  ///
+  /// Zooming back in past [below] would otherwise build every node on screen
+  /// in the same frame, and that is hundreds of them; so would panning fast
+  /// into a crowded part of the board. Lower it for a node that is expensive
+  /// to build, raise it for one that is cheap.
+  final int mountsPerFrame;
+
   @override
   bool operator ==(Object other) =>
       other is NodeSketches &&
       other.sketch == sketch &&
       other.below == below &&
-      other.refresh == refresh;
+      other.refresh == refresh &&
+      other.mountsPerFrame == mountsPerFrame;
 
   @override
-  int get hashCode => Object.hash(sketch, below, refresh);
+  int get hashCode => Object.hash(sketch, below, refresh, mountsPerFrame);
 }
 
 /// One node, zoomed out: a filled box with an optional border and [parts]
