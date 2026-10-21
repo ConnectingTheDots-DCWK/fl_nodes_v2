@@ -141,6 +141,27 @@ void main() {
       expect(sketchShapesAt(sketch, 0.49).any((s) => s.ring > 0), isFalse);
     });
 
+    test('a box\'s own border is drawn over it, and goes as the card\'s '
+        'does', () {
+      final field = ResolvedSketch.of(
+        const NodeSketch(
+          fill: Color(0xFF21242B),
+          parts: <SketchPart>[
+            SketchBox(
+              Rect.fromLTWH(10, 40, 180, 32),
+              Color(0xFF15171C),
+              border: Color(0xFF6E758C),
+            ),
+          ],
+        ),
+        size,
+      );
+      final up = sketchShapesAt(field, 1);
+      expect(up.map((s) => s.ring), <double>[0, 0, 1]);
+      expect(up.last.rect, const Rect.fromLTWH(10, 40, 180, 32));
+      expect(sketchShapesAt(field, 0.4).map((s) => s.ring), <double>[0, 0]);
+    });
+
     test('a corner under a pixel is squared', () {
       // 12 scene units of radius is a pixel at 1/12.
       expect(

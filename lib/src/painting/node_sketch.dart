@@ -125,23 +125,35 @@ sealed class SketchPart {
   const SketchPart();
 }
 
-/// A filled box: a header band, a field, a swatch.
+/// A filled box: a header band, a field, a swatch — with an optional
+/// [border] drawn inside it, which goes once it is too thin to see as the
+/// node's own border does.
 final class SketchBox extends SketchPart {
-  const SketchBox(this.rect, this.color, {this.radius = BorderRadius.zero});
+  const SketchBox(
+    this.rect,
+    this.color, {
+    this.radius = BorderRadius.zero,
+    this.border,
+    this.borderWidth = 1,
+  });
 
   final Rect rect;
   final Color color;
   final BorderRadius radius;
+  final Color? border;
+  final double borderWidth;
 
   @override
   bool operator ==(Object other) =>
       other is SketchBox &&
       other.rect == rect &&
       other.color == color &&
-      other.radius == radius;
+      other.radius == radius &&
+      other.border == border &&
+      other.borderWidth == borderWidth;
 
   @override
-  int get hashCode => Object.hash(rect, color, radius);
+  int get hashCode => Object.hash(rect, color, radius, border, borderWidth);
 }
 
 /// A bar where something the host already measured would be, drawn as it is
