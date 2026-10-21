@@ -72,7 +72,9 @@ void main() {
     ),
   );
 
-  final sketched = NodeSketches(sketch: card);
+  // A plain switch: these tests are about where it is, and the dither has
+  // tests of its own.
+  final sketched = NodeSketches(sketch: card, dither: 0);
 
   void zoom(NodeEditorController controller, double scale) =>
       controller.camera.viewport = ViewportTransform(
@@ -215,7 +217,7 @@ void main() {
       }
 
       await tester.pumpWidget(
-        harness(controller, sketches: NodeSketches(sketch: slow)),
+        harness(controller, sketches: NodeSketches(sketch: slow, dither: 0)),
       );
       zoom(controller, 0.2);
       await tester.pump();
@@ -273,7 +275,7 @@ void main() {
       for (var i = 0; i < 60; i++)
         node('n$i', Offset((i % 10) * 250.0, (i ~/ 10) * 150.0)),
     ]);
-    final few = NodeSketches(sketch: card, mountsPerFrame: 10);
+    final few = NodeSketches(sketch: card, mountsPerFrame: 10, dither: 0);
 
     testWidgets('the first build of a board builds it whole', (tester) async {
       final controller = grid();
@@ -325,6 +327,62 @@ void main() {
       }
       expect(bodies(tester), 60, reason: 'all of them by the sixth frame');
       expect(sketchPainters(tester), isEmpty);
+    });
+  });
+
+  group('the dither', () {
+    final dithered = NodeSketches(sketch: card); // 0.08 above 0.25
+
+    testWidgets('over its range the cards stay built and their sketches '
+        'cover more of them the further out it goes', (tester) async {
+      final controller = pair();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(harness(controller, sketches: dithered));
+      expect(sketchPainters(tester), isEmpty);
+
+      zoom(controller, 0.34);
+      await tester.pump();
+      expect(sketchPainters(tester), isEmpty, reason: 'above the range');
+
+      // The range runs from 0.33 down to 0.22, where the cards go.
+      zoom(controller, 0.3);
+      await tester.pump();
+      expect(bodies(tester), 2);
+      final near = sketchPainters(tester).single;
+      expect(near.nodes, hasLength(2));
+      expect(near.coverage, closeTo(0.03 / 0.11, 1e-6));
+
+      zoom(controller, 0.24);
+      await tester.pump();
+      expect(bodies(tester), 2);
+      expect(
+        sketchPainters(tester).single.coverage,
+        closeTo(0.09 / 0.11, 1e-6),
+      );
+
+      zoom(controller, 0.21);
+      await tester.pump();
+      expect(bodies(tester), 0);
+      expect(sketchPainters(tester).single.coverage, 1);
+    });
+
+    testWidgets('a node being dragged is not dithered', (tester) async {
+      final controller = pair();
+      addTearDown(controller.dispose);
+      zoom(controller, 0.4);
+      await tester.pumpWidget(harness(controller, sketches: dithered));
+      final drag = await tester.startGesture(
+        centreOf(controller, 'a'),
+        kind: PointerDeviceKind.mouse,
+      );
+      await drag.moveBy(const Offset(30, 0));
+      await tester.pump();
+      zoom(controller, 0.3);
+      await tester.pump();
+      expect(sketchPainters(tester).single.nodes.map((n) => n.id), <String>[
+        'b',
+      ]);
+      await drag.up();
     });
   });
 

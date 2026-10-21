@@ -15,7 +15,9 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   a sketch still selects, drags and opens its menu.
   `NodeSketches.refresh` drops cached sketches, and
   `NodeSketches.mountsPerFrame` (48) spreads building cards back in over
-  frames.
+  frames, and `NodeSketches.dither` (0.08) dithers the sketches in over the
+  cards across that much zoom above the switch. `SketchBox.border` outlines
+  a box.
 
 ### Fixed
 

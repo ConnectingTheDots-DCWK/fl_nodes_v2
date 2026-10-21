@@ -1347,6 +1347,23 @@ sketch is one layer for many nodes, so there is no slot between two of them for
 a frame — then a band below the scrim and a band lifted above it, each its
 sketches and then any built nodes over them.
 
+**The switch is dithered** (`NodeSketches.dither`, 0.08 of zoom above
+`below`): across that range the cards stay built and their sketches are
+drawn over them through a 4x4 ordered-dither mask, covering from nothing at
+the top to all of it at `below` less the hysteresis, where the cards go.
+It was the host's ask after seeing the switch on real boards. A dither and
+not a crossfade for two reasons: fading the cards is a `saveLayer` per card,
+and fading the sketch lets a card's text show through the sketch's
+translucent bars. The mask is one `ImageShader` on the same single
+`drawVertices`, under `BlendMode.modulate` — the vertex colours are `dst`,
+the paint is `src` — so it costs a shader and nothing else. It is mapped
+back through the scene's scale and offset to one texel per physical pixel,
+so it stays fixed on the screen and the cards slide under it rather than the
+pattern crawling with them. A dithered sketch draws no rings: the built card
+under it draws its own selection. A node mid-drag or mid-resize is never
+dithered, and sketches are laid out ahead of the range as well as of the
+switch.
+
 **Coming back in**, `mountsPerFrame` (48) new slots a frame, nearest the view's
 middle first, the rest as sketches; a document's first build is whole. On the
 bench card this is a wash — it builds in microseconds, so 648 at once was one

@@ -2384,8 +2384,55 @@ class NodeEditorState extends State<NodeEditor>
       );
     }
 
+    // Built nodes their sketch is dithered in over, short of the switch —
+    // see `NodeSketches.dither`. Never one in the middle of a gesture: it is
+    // being looked at too closely to be turning into bars.
+    final coverage = _sketchCoverage(viewport.scale);
+    final dithered = <String>{};
+    if (coverage > 0) {
+      final config = widget.sketches!;
+      for (final node in drawn) {
+        if (sketched.contains(node.id) ||
+            _draggingNodeIds.contains(node.id) ||
+            _resize?.id == node.id) {
+          continue;
+        }
+        if (_sketches.isReady(
+          node,
+          _controller.layout.sizeOf(node),
+          _sketcherFor(node, config),
+        )) {
+          dithered.add(node.id);
+        }
+      }
+    }
+
+    Widget sketchLayer(List<GraphNode> nodes, String name, double coverage) =>
+        Positioned.fill(
+          key: ValueKey<String>('sketches:$name'),
+          // A painter with no child claims every press inside it; the
+          // canvas underneath is what answers a press on a sketch.
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: SketchPainter(
+                nodes: nodes,
+                sketchOf: _sketchOfNode,
+                origin: origin,
+                scale: viewport.scale,
+                theme: theme,
+                revision: _controller.revision,
+                selectionRevision: _controller.selection.revision,
+                selected: _controller.selection.nodeIds,
+                target: _pendingTarget?.nodeId,
+                coverage: coverage,
+                devicePixelRatio: _devicePixelRatio,
+              ),
+            ),
+          ),
+        );
+
     final children = <Widget>[];
-    if (sketched.isEmpty) {
+    if (sketched.isEmpty && dithered.isEmpty) {
       for (var index = 0; index <= drawn.length; index++) {
         if (index == focusAt) children.add(emphasisLayer());
         for (final (group, frame)
@@ -2402,39 +2449,23 @@ class NodeEditorState extends State<NodeEditor>
       for (final entry in groups) {
         children.add(groupLayer(entry.$1, entry.$2));
       }
-      // Below the scrim and above it, each band its sketches and then the
-      // nodes still built — one dragged, one being typed in — over them.
+      // Below the scrim and above it, each band its sketches, then the nodes
+      // still built over them, then the dither over those.
       void band(List<GraphNode> nodes, String name) {
         final painted = <GraphNode>[
           for (final node in nodes)
             if (sketched.contains(node.id)) node,
         ];
-        if (painted.isNotEmpty) {
-          children.add(
-            Positioned.fill(
-              key: ValueKey<String>('sketches:$name'),
-              // A painter with no child claims every press inside it; the
-              // canvas underneath is what answers a press on a sketch.
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: SketchPainter(
-                    nodes: painted,
-                    sketchOf: _sketchOfNode,
-                    origin: origin,
-                    scale: viewport.scale,
-                    theme: theme,
-                    revision: _controller.revision,
-                    selectionRevision: _controller.selection.revision,
-                    selected: _controller.selection.nodeIds,
-                    target: _pendingTarget?.nodeId,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
+        if (painted.isNotEmpty) children.add(sketchLayer(painted, name, 1));
         for (final node in nodes) {
           if (!sketched.contains(node.id)) children.add(nodeLayer(node));
+        }
+        final over = <GraphNode>[
+          for (final node in nodes)
+            if (dithered.contains(node.id)) node,
+        ];
+        if (over.isNotEmpty) {
+          children.add(sketchLayer(over, '$name:dither', coverage));
         }
       }
 
@@ -2514,7 +2545,11 @@ class NodeEditorState extends State<NodeEditor>
     final clock = Stopwatch()..start();
 
     if (!_sketching) {
-      if (scale < config.below * _sketchPrewarm) {
+      if (scale <
+          math.max(
+            config.below * _sketchPrewarm,
+            config.below + config.dither,
+          )) {
         var waiting = false;
         for (final node in drawn) {
           if (!_readySketch(node, config, clock)) waiting = true;
@@ -2538,6 +2573,23 @@ class NodeEditorState extends State<NodeEditor>
     if (waiting) _scheduleSketchFrame();
     return chosen;
   }
+
+  /// How much of each built node's sketch is drawn over it at [scale]:
+  /// nothing above the dither range, all of it where the nodes stop being
+  /// built — `below` less the hysteresis — and evenly between.
+  ///
+  /// Past the switch it is 0, because then the sketches are drawn whole and
+  /// nothing is built under them to dither over.
+  double _sketchCoverage(double scale) {
+    final config = widget.sketches;
+    if (config == null || config.dither <= 0 || _sketching) return 0;
+    final top = config.below + config.dither;
+    final bottom = config.below - _sketchHysteresis;
+    return ((top - scale) / (top - bottom)).clamp(0.0, 1.0);
+  }
+
+  double get _devicePixelRatio =>
+      MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
 
   /// Whether [node]'s sketch is ready, laying it out first if [clock] is
   /// still inside [_sketchBudget].

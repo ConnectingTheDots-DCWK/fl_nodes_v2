@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
@@ -139,6 +141,27 @@ void main() {
     test('a border under half a pixel goes', () {
       expect(sketchShapesAt(sketch, 0.51).any((s) => s.ring > 0), isTrue);
       expect(sketchShapesAt(sketch, 0.49).any((s) => s.ring > 0), isFalse);
+    });
+
+    test('a box\'s own border is drawn over it, and goes as the card\'s '
+        'does', () {
+      final field = ResolvedSketch.of(
+        const NodeSketch(
+          fill: Color(0xFF21242B),
+          parts: <SketchPart>[
+            SketchBox(
+              Rect.fromLTWH(10, 40, 180, 32),
+              Color(0xFF15171C),
+              border: Color(0xFF6E758C),
+            ),
+          ],
+        ),
+        size,
+      );
+      final up = sketchShapesAt(field, 1);
+      expect(up.map((s) => s.ring), <double>[0, 0, 1]);
+      expect(up.last.rect, const Rect.fromLTWH(10, 40, 180, 32));
+      expect(sketchShapesAt(field, 0.4).map((s) => s.ring), <double>[0, 0]);
     });
 
     test('a corner under a pixel is squared', () {
@@ -292,6 +315,53 @@ void main() {
 
       expect(calls(record(painter(const <GraphNode>[])), #drawVertices), 0);
     });
+  });
+
+  test('each dither level lights that many pixels of the sixteen', () async {
+    for (final level in <int>[0, 1, 5, 8, 15, 16]) {
+      final bytes = (await ditherMask(
+        level,
+      ).toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      var lit = 0;
+      for (var i = 3; i < bytes.lengthInBytes; i += 4) {
+        if (bytes.getUint8(i) == 255) lit++;
+      }
+      expect(lit, level);
+    }
+  });
+
+  test('a dithered sketch is masked, and draws no rings: the card under it '
+      'draws its own', () {
+    final cache = SketchCache();
+    SketchPainter painter(double coverage) => SketchPainter(
+      nodes: <GraphNode>[node('a')],
+      sketchOf: (n) => cache.resolve(n, size, card),
+      origin: Offset.zero,
+      scale: 0.3,
+      theme: NodeEditorTheme.dark(),
+      revision: 0,
+      selectionRevision: 0,
+      selected: const <String>{'a'},
+      coverage: coverage,
+    );
+    List<Invocation> record(SketchPainter p) {
+      final canvas = TestRecordingCanvas();
+      p.paint(canvas, const Size(800, 600));
+      return <Invocation>[for (final i in canvas.invocations) i.invocation];
+    }
+
+    final whole = record(painter(1));
+    final vertices = whole.firstWhere((i) => i.memberName == #drawVertices);
+    expect((vertices.positionalArguments[2] as Paint).shader, isNull);
+    expect(whole.where((i) => i.memberName == #drawRRect), hasLength(1));
+
+    final half = record(painter(0.5));
+    final masked = half.firstWhere((i) => i.memberName == #drawVertices);
+    expect((masked.positionalArguments[2] as Paint).shader, isNotNull);
+    expect(masked.positionalArguments[1], BlendMode.modulate);
+    expect(half.where((i) => i.memberName == #drawRRect), isEmpty);
+
+    expect(record(painter(0)), isEmpty);
   });
 
   test('a note is sketched with its text inside its padding', () {

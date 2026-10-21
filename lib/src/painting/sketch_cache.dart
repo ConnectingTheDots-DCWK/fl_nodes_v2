@@ -51,8 +51,17 @@ class ResolvedSketch {
     final shapes = <SketchShape>[SketchShape(body, sketch.fill, sketch.radius)];
     for (final part in sketch.parts) {
       switch (part) {
-        case SketchBox(:final rect, :final color, :final radius):
+        case SketchBox(
+          :final rect,
+          :final color,
+          :final radius,
+          :final border,
+          :final borderWidth,
+        ):
           shapes.add(SketchShape(rect, color, radius));
+          if (border != null && borderWidth > 0) {
+            shapes.add(SketchShape(rect, border, radius, ring: borderWidth));
+          }
         case SketchBar(:final rect, :final color):
           shapes.add(SketchShape(rect, color, BorderRadius.zero));
         case SketchText():
