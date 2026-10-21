@@ -110,6 +110,46 @@ class BenchCard extends StatelessWidget {
   }
 }
 
+/// [BenchCard] as a sketch, part for part, for `SKETCH=on`.
+NodeSketch benchSketch(GraphNode node, Size size) => NodeSketch(
+  fill: _surface,
+  radius: const BorderRadius.all(Radius.circular(8)),
+  border: _border,
+  borderWidth: CardMetrics.borderWidth,
+  parts: <SketchPart>[
+    SketchBox(
+      Rect.fromLTWH(0, 0, size.width, CardMetrics.headerHeight),
+      _accent.withValues(alpha: 0.16),
+      radius: const BorderRadius.vertical(top: Radius.circular(7)),
+    ),
+    SketchBox(
+      Rect.fromLTWH(10, (CardMetrics.headerHeight - 11) / 2, 11, 11),
+      _accent,
+      radius: const BorderRadius.all(Radius.circular(2)),
+    ),
+    SketchText(
+      Rect.fromLTWH(32, 0, size.width - 42, CardMetrics.headerHeight),
+      node.title,
+      const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: _titleInk,
+      ),
+    ),
+    SketchText(
+      Rect.fromLTRB(
+        10,
+        CardMetrics.headerHeight + 8,
+        size.width - 10,
+        size.height - 10,
+      ),
+      node.subtitle ?? '',
+      const TextStyle(fontSize: 11.5, height: 1.35, color: _bodyInk),
+      maxLines: null,
+    ),
+  ],
+);
+
 /// Which painter tier [TierPainter] draws.
 enum Tier { atlas, card, blocks }
 

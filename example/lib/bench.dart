@@ -44,6 +44,7 @@ import 'workflow_node_card.dart';
 /// | `TEXT`, `BORDER`, `ROUND` | on | `replica`'s text, border and corners |
 /// | `OVERLAY` | none | `atlas`, `card` or `blocks`: one painter draws every node |
 /// | `CAPTURE` | 0.38 | the zoom `OVERLAY=atlas` snapshots were taken at |
+/// | `SKETCH` | off | `on`: `NodeSketches` with [benchSketch], level of detail as shipped |
 ///
 /// `BODY=replica` with one switch off prices that feature of the card. An
 /// `OVERLAY` leaves every body empty and draws the nodes from one painter over
@@ -64,6 +65,7 @@ const String kBorder = String.fromEnvironment('BORDER', defaultValue: 'on');
 const String kRound = String.fromEnvironment('ROUND', defaultValue: 'on');
 const String kOverlay = String.fromEnvironment('OVERLAY', defaultValue: 'none');
 const String kCapture = String.fromEnvironment('CAPTURE', defaultValue: '0.38');
+const String kSketch = String.fromEnvironment('SKETCH', defaultValue: 'off');
 
 /// Zoom levels the sweep visits below 100%, and the frames it spends zooming
 /// to each and then panning at it.
@@ -352,6 +354,9 @@ class _BenchPageState extends State<_BenchPage>
       key: _editorKey,
       controller: _controller,
       theme: _theme,
+      sketches: kSketch == 'on'
+          ? const NodeSketches(sketch: benchSketch)
+          : null,
       nodeBuilder: (context, node, state) => switch (kBody) {
         _ when _tier != null => const SizedBox.expand(),
         'plain' => const ColoredBox(color: Color(0xFF2A2F3A)),
