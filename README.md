@@ -669,6 +669,10 @@ small to see, so a card thins down to a block as you keep zooming.
   one holding the keyboard focus.
 - **A sketch still takes presses**: a tap selects, a drag moves, a right click
   opens the node's menu, and a double tap reaches `onNodeDoubleTap`.
+- **The switch is dithered.** Over `NodeSketches.dither` (0.08) of zoom
+  above it, each card's sketch shows through it in a fixed screen-door
+  pattern that fills in as you zoom out, so text turns to bars a few pixels
+  at a time. 0 makes it a plain switch.
 - **Coming back in, cards are built a few a frame**
   (`NodeSketches.mountsPerFrame`, 48), nearest the middle first, with their
   sketches standing in. Lower it if your cards are expensive to build.

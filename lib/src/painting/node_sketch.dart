@@ -31,6 +31,7 @@ class NodeSketches {
     this.below = 0.25,
     this.refresh,
     this.mountsPerFrame = 48,
+    this.dither = 0.08,
   });
 
   /// Pass the same function on every build: sketches are cached against it,
@@ -57,16 +58,30 @@ class NodeSketches {
   /// to build, raise it for one that is cheap.
   final int mountsPerFrame;
 
+  /// How far above [below], in zoom, the sketches start to show through the
+  /// built cards — or 0 for a plain switch.
+  ///
+  /// Across this range the cards stay built and each one's sketch is drawn
+  /// over it through an ordered dither, a fixed screen-door pattern whose
+  /// coverage grows from nothing at the top of the range to the whole card
+  /// where the cards stop being built. So nothing changes in one frame: the
+  /// text goes over to bars a few pixels at a time, and on the way back in
+  /// the cards being built a few a frame arrive under the pattern rather
+  /// than popping in.
+  final double dither;
+
   @override
   bool operator ==(Object other) =>
       other is NodeSketches &&
       other.sketch == sketch &&
       other.below == below &&
       other.refresh == refresh &&
-      other.mountsPerFrame == mountsPerFrame;
+      other.mountsPerFrame == mountsPerFrame &&
+      other.dither == dither;
 
   @override
-  int get hashCode => Object.hash(sketch, below, refresh, mountsPerFrame);
+  int get hashCode =>
+      Object.hash(sketch, below, refresh, mountsPerFrame, dither);
 }
 
 /// One node, zoomed out: a filled box with an optional border and [parts]

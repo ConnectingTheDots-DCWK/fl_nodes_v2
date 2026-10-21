@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/rendering.dart';
 
 import '../model/graph_node.dart';
@@ -134,6 +135,8 @@ class SketchPainter extends CustomPainter {
     required this.selectionRevision,
     this.selected = const <String>{},
     this.target,
+    this.coverage = 1,
+    this.devicePixelRatio = 1,
   });
 
   /// In paint order, bottom first.
@@ -152,8 +155,18 @@ class SketchPainter extends CustomPainter {
   /// The node a wire being dragged would land on.
   final String? target;
 
+  /// How much of each sketch is drawn, from 0 to 1, through an ordered
+  /// dither — see `NodeSketches.dither`. Under 1 the nodes are built
+  /// beneath, so their own selection is what shows and no ring is drawn.
+  final double coverage;
+
+  /// For the dither, which is laid out in physical pixels so it stays put on
+  /// the screen while the canvas pans and zooms under it.
+  final double devicePixelRatio;
+
   @override
   void paint(Canvas canvas, Size size) {
+    if (coverage <= 0) return;
     canvas
       ..save()
       ..translate(-origin.dx, -origin.dy);
@@ -178,7 +191,13 @@ class SketchPainter extends CustomPainter {
         outlined.add((node, sketch));
       }
     }
-    triangles.draw(canvas);
+    if (coverage >= 1) {
+      triangles.draw(canvas);
+    } else {
+      triangles.draw(canvas, mask: _ditherShader());
+      canvas.restore();
+      return;
+    }
 
     // Rings, stroked and anti-aliased over everything: there are few of them,
     // and each has to stay visible however far out the canvas is.
@@ -209,6 +228,29 @@ class SketchPainter extends CustomPainter {
     canvas.restore();
   }
 
+  /// The dither pattern for [coverage], tiled one texel to a physical pixel.
+  ///
+  /// The canvas here is the scene, scaled and offset, so the pattern is mapped
+  /// back through both: a texel lands on one physical pixel of the screen
+  /// whatever the zoom, and a pan slides the cards under a pattern that stays
+  /// where it is — the screen-door look, rather than a pattern crawling with
+  /// the content.
+  Shader _ditherShader() {
+    final step = 1 / (scale * devicePixelRatio);
+    return ImageShader(
+      ditherMask((coverage * _bayerLevels).round()),
+      TileMode.repeated,
+      TileMode.repeated,
+      Float64List.fromList(<double>[
+        step, 0, 0, 0, //
+        0, step, 0, 0, //
+        0, 0, 1, 0, //
+        origin.dx, origin.dy, 0, 1,
+      ]),
+      filterQuality: FilterQuality.none,
+    );
+  }
+
   /// [gap] and [width] are scene units with a floor in screen pixels, so a
   /// ring keeps its shape up close and stays a ring far out.
   void _ring(
@@ -236,6 +278,8 @@ class SketchPainter extends CustomPainter {
       oldDelegate.origin != origin ||
       oldDelegate.scale != scale ||
       oldDelegate.target != target ||
+      oldDelegate.coverage != coverage ||
+      oldDelegate.devicePixelRatio != devicePixelRatio ||
       !identical(oldDelegate.theme, theme) ||
       !identical(oldDelegate.sketchOf, sketchOf) ||
       oldDelegate.nodes.length != nodes.length;
@@ -407,7 +451,9 @@ class _Triangles {
     return k ~/ 2;
   }
 
-  void draw(Canvas canvas) {
+  /// [mask], when given, is multiplied into every triangle: transparent
+  /// where it is transparent, the vertex colour where it is opaque.
+  void draw(Canvas canvas, {Shader? mask}) {
     if (_vertices == 0) return;
     canvas.drawVertices(
       ui.Vertices.raw(
@@ -415,9 +461,57 @@ class _Triangles {
         Float32List.sublistView(_positions, 0, _vertices * 2),
         colors: Int32List.sublistView(_colors, 0, _vertices),
       ),
-      // The vertex colours alone: `dst` keeps them and ignores the paint.
-      BlendMode.dst,
-      Paint(),
+      // The vertex colours are `dst` and the paint is `src`: alone, `dst`
+      // keeps the colours and ignores the paint; masked, `modulate`
+      // multiplies the two, which is the mask applied.
+      mask == null ? BlendMode.dst : BlendMode.modulate,
+      Paint()..shader = mask,
     );
   }
 }
+
+/// The 4x4 ordered-dither matrix: the order its sixteen cells light in, chosen
+/// so every level is as evenly spread as sixteen cells allow.
+const List<int> _bayer = <int>[
+  0,
+  8,
+  2,
+  10,
+  12,
+  4,
+  14,
+  6,
+  3,
+  11,
+  1,
+  9,
+  15,
+  7,
+  13,
+  5,
+];
+
+const int _bayerLevels = 16;
+
+final Map<int, ui.Image> _masks = <int, ui.Image>{};
+
+/// A 4x4 tile with [level] of its sixteen pixels opaque white and the rest
+/// clear, made once per level and kept.
+@visibleForTesting
+ui.Image ditherMask(int level) => _masks[level.clamp(0, _bayerLevels)] ??= () {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  final white = Paint()..color = const Color(0xFFFFFFFF);
+  for (var i = 0; i < _bayer.length; i++) {
+    if (_bayer[i] < level) {
+      canvas.drawRect(
+        Rect.fromLTWH((i % 4).toDouble(), (i ~/ 4).toDouble(), 1, 1),
+        white,
+      );
+    }
+  }
+  final picture = recorder.endRecording();
+  final image = picture.toImageSync(4, 4);
+  picture.dispose();
+  return image;
+}();
