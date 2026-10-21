@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
-import 'package:fl_nodes_v2_example/main.dart';
 import 'package:fl_nodes_v2_example/definition_nodes.dart';
 import 'package:fl_nodes_v2_example/sample_graph.dart';
+
+import 'pump_demo.dart';
 
 void main() {
   /// Stands in for the platform clipboard.
@@ -72,7 +73,7 @@ void main() {
   });
 
   testWidgets('copy writes a document, paste reads it back', (tester) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
 
     await useDocumentMenu(tester, 'Copy as JSON');
@@ -106,7 +107,7 @@ void main() {
   testWidgets('a document from the future is refused, and nothing is lost', (
     tester,
   ) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
     clipboard = jsonEncode(<String, Object?>{'version': 99});
 
@@ -123,7 +124,7 @@ void main() {
   });
 
   testWidgets('malformed JSON says where it went wrong', (tester) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
     clipboard = jsonEncode(<String, Object?>{
       'version': 1,

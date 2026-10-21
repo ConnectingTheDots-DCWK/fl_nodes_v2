@@ -3,16 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 import 'package:fl_nodes_v2_example/form_node_body.dart';
-import 'package:fl_nodes_v2_example/main.dart';
 import 'package:fl_nodes_v2_example/definition_nodes.dart';
 import 'package:fl_nodes_v2_example/sample_graph.dart';
 import 'package:fl_nodes_v2_example/workflow_node.dart';
+
+import 'pump_demo.dart';
 
 void main() {
   testWidgets('the demo boots with the sample workflow on screen', (
     tester,
   ) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
 
     expect(find.byType(NodeEditor), findsOneWidget);
@@ -37,7 +38,7 @@ void main() {
   testWidgets('the sample note is on the canvas and can be written in', (
     tester,
   ) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
 
     final note = find.ancestor(
@@ -58,7 +59,7 @@ void main() {
   testWidgets('the sample group frames its four nodes and moves them', (
     tester,
   ) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
 
     final controller = tester
@@ -99,7 +100,7 @@ void main() {
   testWidgets('right-clicking the canvas offers every named node type', (
     tester,
   ) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
 
     // Top-right: clear of the sample graph, and clear of the status chip,

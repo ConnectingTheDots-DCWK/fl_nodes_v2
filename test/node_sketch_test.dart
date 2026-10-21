@@ -150,12 +150,23 @@ void main() {
       expect(sketchShapesAt(sketch, 0.08).first.radius, BorderRadius.zero);
     });
 
-    test('a bar under a pixel and a half goes', () {
-      // A 12px font's bar is 6.72 tall: a pixel and a half at about 0.223.
-      expect(sketchShapesAt(sketch, 0.23).where((s) => s.color.a < 1), [
-        isA<SketchShape>(),
-      ]);
-      expect(sketchShapesAt(sketch, 0.22).where((s) => s.color.a < 1), isEmpty);
+    test('a bar under a pixel is drawn a pixel thick and fainter, and '
+        'under a third of one it goes', () {
+      // A 12px font's bar is 6.72 tall: a pixel at about 0.149.
+      List<SketchShape> barsAt(double scale) => <SketchShape>[
+        for (final shape in sketchShapesAt(sketch, scale))
+          if (shape.color.a < 1) shape,
+      ];
+      final full = barsAt(0.15).single;
+      expect(full.rect.height, closeTo(6.72, 0.01));
+      expect(full.color.a, closeTo(sketchInk, 0.01));
+
+      final thin = barsAt(0.1).single;
+      expect(thin.rect.height * 0.1, closeTo(1, 0.001));
+      expect(thin.color.a, closeTo(sketchInk * 0.672, 0.01));
+
+      expect(barsAt(0.045), hasLength(1));
+      expect(barsAt(0.044), isEmpty);
     });
 
     test('a node under three pixels is one box, tinted by its header', () {

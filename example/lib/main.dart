@@ -426,6 +426,11 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
       canvasDragBehavior: _dragBehavior,
       nodeBuilder: (context, node, state) =>
           WorkflowNodeCard(node: node, state: state, isDark: widget.isDark),
+      // Zoomed out past a quarter, the cards are drawn from these instead of
+      // being built — see `NodeSketches`.
+      sketches: NodeSketches(
+        sketch: widget.isDark ? workflowSketchDark : workflowSketchLight,
+      ),
       // Dropping a wire on empty canvas offers the Create menu there rather
       // than guessing a node type, which is what it used to do.
       contextMenus: NodeEditorMenus(

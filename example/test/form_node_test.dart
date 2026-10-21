@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 import 'package:fl_nodes_v2_example/form_node_body.dart';
-import 'package:fl_nodes_v2_example/main.dart';
 import 'package:fl_nodes_v2_example/workflow_node.dart';
+
+import 'pump_demo.dart';
 
 void main() {
   // The demo has more than one text field on screen now, so say which.
@@ -13,7 +14,7 @@ void main() {
   );
 
   Future<NodeEditorController> boot(WidgetTester tester) async {
-    await tester.pumpWidget(const NodeEditorDemoApp());
+    await pumpDemo(tester);
     await tester.pumpAndSettle();
     return tester.widget<NodeEditor>(find.byType(NodeEditor)).controller;
   }

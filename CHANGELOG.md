@@ -5,6 +5,18 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
 ## Unreleased
 
+### Added
+
+- **Level of detail.** `NodeEditor.sketches` (null, off): past
+  `NodeSketches.below` (0.25), every node is drawn from a `NodeSketch` the
+  host describes — boxes, bars and `SketchText` laid out into a bar per line
+  — instead of being built, in one pass. Parts fade out as they get too small
+  to see. A node being dragged, resized or holding the focus stays built, and
+  a sketch still selects, drags and opens its menu.
+  `NodeSketches.refresh` drops cached sketches, and
+  `NodeSketches.mountsPerFrame` (48) spreads building cards back in over
+  frames.
+
 ### Fixed
 
 - **Panning and zooming no longer slow down with the number of handles on

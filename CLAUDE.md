@@ -34,6 +34,7 @@ cd example && fvm flutter analyze && fvm flutter test
 fvm flutter test benchmark/node_editor_benchmark.dart   # model, 5000 nodes
 fvm flutter test benchmark/widget_benchmark.dart        # one frame of interaction
 fvm flutter test benchmark/zoom_benchmark.dart          # zooming out, level by level
+fvm flutter test benchmark/sketch_benchmark.dart        # laying out and drawing sketches
 fvm flutter run -d linux                                # nothing replaces looking
 ```
 
@@ -107,10 +108,10 @@ comparison there is `identical` on purpose.
 ## Why things are painted rather than built
 
 Connections, port handles, the grid and the overlays are painters. Beyond the
-obvious cost, this is what makes **level of detail a paint-time condition**: an
-`if` inside a painter rather than widgets coming and going. Doing LOD with
-widgets means rebuilding every node on screen at the threshold, which stutters
-exactly when the user is moving.
+obvious cost, this is what makes level of detail *within* a layer a
+paint-time condition — an `if` inside a painter, as `portMinScale` and the
+caption threshold are. The nodes themselves are widgets, and taking them away
+past a zoom is its own section: *Level of detail*.
 
 - **The grid is a fragment shader** (`lib/shaders/grid.frag`) — one `drawRect`,
   cost per pixel rather than per line. `GridPainter` falls back to lines if it
@@ -1281,6 +1282,83 @@ the nodes drawn by one painter over the editor; `example/lib/bench_tiers.dart`):
   them. So the steps between full detail and blocks can be as gradual as the
   eye wants: what costs is the widget per node and real glyphs, not how much
   of the card a painter draws.
+
+## Level of detail
+
+Past `NodeSketches.below` (0.25) a node is not built: `SketchPainter` draws it
+from a `NodeSketch` the host described. Everything here was decided against
+the *Zoomed out* numbers and a throwaway demo on a real Ripple board.
+
+**No snapshot tier.** An image of each card captured as it left full detail
+was indistinguishable from the card, and cost what a painted sketch costs to
+draw — but it is memory per card at screen resolution, needs capturing a card
+that was never on screen, and goes stale whenever the card does. The step it
+covered, 60% down to 25%, is where built cards are already cheap.
+
+**The host describes, the package draws.** The package cannot know what a node
+looks like, so a sketch is data: a fill, a border, a halo, and boxes, bars and
+`SketchText` in the node's coordinates. Text is the host's words and style and
+the package's measuring — `TextPainter` line metrics, one bar per line over the
+x-height at the text's colour times `sketchInk` (0.42) — which is what makes a
+sketch line up with its card so the switch is hard to see.
+
+**One switch, and parts fade.** There was a two-threshold design with a Blocks
+tier; the user picked one switch with every part dropping out on its own
+instead (`sketch_painter.dart` has the constants):
+
+- a border under half a pixel goes; a corner under a pixel is squared;
+- a box or bar under a pixel is drawn **one pixel thick at proportionally
+  less alpha**, and goes under a third of one. The first cut dropped bars at
+  1.5 px, which at 21% took every 11.5 px subtitle off the example's cards at
+  the very zoom they stopped being built — exactly the jump this exists to
+  avoid. Drawn at their real thickness they would shimmer instead, because
+  triangles are not anti-aliased: a sub-pixel bar lights a row or none
+  depending on where it lands;
+- under 3 px on its short side a node is one box in `ResolvedSketch.flat`, its
+  fill with every box mixed in by area, so a header band still tints the dot.
+
+**One `drawVertices`, in paint order.** Batching by colour into a path each is
+fewer draws but paints every node's bars over every node's body, so the card
+underneath shows its text through the card on top. Triangles in one list keep
+the order exactly. The buffer is shared and refilled, corners take 1, 2 or 4
+segments by their size on screen, and the shape visitor is a callback, not a
+`sync*` — each of those halved what was left of the frame
+(`benchmark/sketch_benchmark.dart`: 13.7 -> 6.1 ms at 25% over 2592 Ripple-sized
+cards in JIT). Rings — selection, the drop target, a halo — are stroked and
+anti-aliased on top, with a floor in screen pixels so they stay rings.
+
+**Laying out costs ~0.1 ms a card, and is spread.** It is the engine's text
+layout, so AOT barely helps; a screenful at the switch was a stall. A frame
+spends at most 4 ms, a node whose sketch is not ready **stays built**, and from
+1.6x the threshold down sketches are laid out ahead of the switch. Estimating
+line breaks instead would have been cheap and would have lost the bars lining
+up. The cache keeps a node's bars when it is a new instance whose sketch comes
+out equal — a node that only moved — and is keyed on the sketcher's identity,
+which is why the notes' sketcher is held per canvas colour like
+`_commentBuilder`.
+
+**What stays built**: dragged and resized nodes (unmounting ends the gesture)
+and the node holding the primary focus, found by `NodeView` above the focused
+context. A sketch has no widget, so the canvas answers its presses through
+`_sketchedNodeAt` — a node under the pointer with no slot. Touch still pans.
+
+**Layering.** With anything sketched, frames go first and all together — a
+sketch is one layer for many nodes, so there is no slot between two of them for
+a frame — then a band below the scrim and a band lifted above it, each its
+sketches and then any built nodes over them.
+
+**Coming back in**, `mountsPerFrame` (48) new slots a frame, nearest the view's
+middle first, the rest as sketches; a document's first build is whole. On the
+bench card this is a wash — it builds in microseconds, so 648 at once was one
+10 ms frame — and the number exists for cards that are not cheap.
+
+| profile, 2560x1348, 10,000 nodes, `BODY=replica`, p50 panning | raster | with `SKETCH=on` |
+| --- | --- | --- |
+| 19%, 1634 drawn | 28.5 ms | 2.9 ms |
+| 15%, 2592 drawn | 47.2 ms | 4.9 ms |
+
+Build at 15% is 6 ms either way: what is left is culling and the cache walk
+over 2592 nodes, not the widgets.
 
 ## Known costs
 

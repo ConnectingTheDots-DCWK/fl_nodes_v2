@@ -246,3 +246,71 @@ class _BranchList extends StatelessWidget {
     );
   }
 }
+
+/// [WorkflowNodeCard] zoomed out, part for part: the tinted header with its
+/// icon and title, then the subtitle or the branch rows. The bodies with
+/// fields of their own are left as plain card, which is all they read as at
+/// a quarter of their size.
+///
+/// Two top-level functions rather than one closure over `isDark`, because the
+/// editor caches sketches against the function's identity: a closure made
+/// per build would throw every sketch away on every build.
+NodeSketch workflowSketchDark(GraphNode node, Size size) =>
+    _workflowSketch(node, size, isDark: true);
+
+NodeSketch workflowSketchLight(GraphNode node, Size size) =>
+    _workflowSketch(node, size, isDark: false);
+
+NodeSketch _workflowSketch(GraphNode node, Size size, {required bool isDark}) {
+  final style = WorkflowStyle.of(node.workflowType);
+  const header = CardMetrics.headerHeight;
+  final muted = isDark ? const Color(0xFF98A0B4) : const Color(0xFF5C6478);
+  final subtitle = node.subtitle;
+  return NodeSketch(
+    fill: isDark ? const Color(0xFF232733) : Colors.white,
+    radius: const BorderRadius.all(Radius.circular(8)),
+    border: isDark ? const Color(0xFF32384A) : const Color(0xFFDDE1EA),
+    borderWidth: CardMetrics.borderWidth,
+    parts: <SketchPart>[
+      SketchBox(
+        Rect.fromLTWH(0, 0, size.width, header),
+        style.color.withValues(alpha: isDark ? 0.16 : 0.12),
+        radius: const BorderRadius.vertical(top: Radius.circular(7)),
+      ),
+      SketchBox(
+        const Rect.fromLTWH(11, (header - 13) / 2, 13, 13),
+        style.color,
+        radius: const BorderRadius.all(Radius.circular(3)),
+      ),
+      SketchText(
+        Rect.fromLTWH(32, 0, size.width - 42, header),
+        node.title,
+        TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: isDark ? const Color(0xFFE6E9F0) : const Color(0xFF1E2230),
+        ),
+      ),
+      if (node.workflowType == WorkflowNodeType.condition)
+        for (final (index, branch) in node.branches.indexed)
+          SketchText(
+            Rect.fromLTWH(
+              10,
+              header + CardMetrics.bodyPadding + index * CardMetrics.rowHeight,
+              size.width - 20,
+              CardMetrics.rowHeight,
+            ),
+            branch,
+            TextStyle(fontSize: 11.5, color: muted),
+            align: TextAlign.right,
+          )
+      else if (subtitle != null && subtitle.isNotEmpty)
+        SketchText(
+          Rect.fromLTRB(10, header + 8, size.width - 10, size.height - 10),
+          subtitle,
+          TextStyle(fontSize: 11.5, height: 1.35, color: muted),
+          maxLines: null,
+        ),
+    ],
+  );
+}
