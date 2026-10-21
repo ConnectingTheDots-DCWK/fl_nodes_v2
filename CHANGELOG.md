@@ -3,21 +3,30 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
-## Unreleased
+## 1.4.0
+
+Level of detail: a board zoomed out far enough is drawn from sketches the
+host describes, in one pass, instead of a widget per node — about ten times
+less raster work with thousands of nodes on screen. Off until a host asks
+for it. And panning and zooming no longer slow down with the number of port
+handles in view.
 
 ### Added
 
 - **Level of detail.** `NodeEditor.sketches` (null, off): past
   `NodeSketches.below` (0.25), every node is drawn from a `NodeSketch` the
-  host describes — boxes, bars and `SketchText` laid out into a bar per line
-  — instead of being built, in one pass. Parts fade out as they get too small
-  to see. A node being dragged, resized or holding the focus stays built, and
-  a sketch still selects, drags and opens its menu.
-  `NodeSketches.refresh` drops cached sketches, and
-  `NodeSketches.mountsPerFrame` (48) spreads building cards back in over
-  frames, and `NodeSketches.dither` (0.08) dithers the sketches in over the
-  cards across that much zoom above the switch. `SketchBox.border` outlines
-  a box.
+  host describes — boxes (`SketchBox`, with an optional `border`), bars and
+  `SketchText` laid out into a bar per line — instead of being built, in one
+  pass. Parts fade out as they get too small to see. A node being dragged,
+  resized or holding the focus stays built, and a sketch still selects,
+  drags and opens its menu.
+- `NodeSketches.dither` (0.08): across that much zoom above the switch, the
+  sketches are dithered in over the cards rather than replacing them in one
+  frame.
+- `NodeSketches.mountsPerFrame` (48): coming back in, cards are built a few
+  a frame, nearest the middle first, with their sketches standing in.
+- `NodeSketches.refresh`: a `Listenable` that drops every cached sketch, for
+  what a sketch reads besides its node.
 
 ### Fixed
 
