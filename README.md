@@ -27,7 +27,7 @@ cd example && flutter run
 
 ```yaml
 dependencies:
-  fl_nodes_v2: ^1.4.0
+  fl_nodes_v2: ^1.5.0
 ```
 
 ```dart
