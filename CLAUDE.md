@@ -1051,6 +1051,17 @@ Two caches, and they are the whole performance story:
   Together the two mean a scroll tick repaints one layer and rebuilds nothing.
   Do not "tidy" the `repaint` away.
 
+**The panel's colours are the host's when it gives them.** `MinimapPalette`
+reads off the canvas background by default, as `CommentView` does, but a host
+with a palette of its own — a warm theme the two built-ins cannot match —
+sets `MinimapConfig.palette` and it is used as it is. It is on the config
+rather than `NodeEditorTheme` because it is the panel's and nothing else's.
+`MinimapPalette` compares by value for the same reason `MinimapConfig` does:
+a host building the same palette per rebuild must not cost the cached panel,
+and `didUpdateWidget` rebuilds the painter when the palette changes — the
+painter keeps its own copy, so a frame recoloured over a stale map is the
+failure the test pins.
+
 `MinimapScene` is keyed on `revision` the way `ConnectionLayout` is, and holds
 **scene**-space rects: map space depends on the panel size and the zoom cap,
 both of which move without the graph moving. Colours are re-derived every pass

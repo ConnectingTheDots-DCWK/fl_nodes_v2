@@ -3,6 +3,7 @@ import 'package:flutter/painting.dart';
 
 import '../l10n/node_editor_localizations.dart';
 import '../model/graph_node.dart';
+import 'minimap_palette.dart';
 
 /// The colour a node is drawn in on the map, or null to take the default.
 ///
@@ -34,6 +35,7 @@ class MinimapConfig {
     List<(String, Size)>? sizePresets,
     String? title,
     this.nodeColor,
+    this.palette,
   }) : _sizePresets = sizePresets,
        _title = title;
 
@@ -101,6 +103,11 @@ class MinimapConfig {
 
   final MinimapNodeColor? nodeColor;
 
+  /// The panel's own colours. Null, the default, picks
+  /// `MinimapPalette.onDark` or `MinimapPalette.onLight` by the canvas
+  /// background; given, it is used as it is.
+  final MinimapPalette? palette;
+
   MinimapConfig copyWith({
     Alignment? alignment,
     EdgeInsets? margin,
@@ -109,6 +116,7 @@ class MinimapConfig {
     List<(String, Size)>? sizePresets,
     String? title,
     MinimapNodeColor? nodeColor,
+    MinimapPalette? palette,
   }) => MinimapConfig(
     alignment: alignment ?? this.alignment,
     margin: margin ?? this.margin,
@@ -117,6 +125,7 @@ class MinimapConfig {
     sizePresets: sizePresets ?? _sizePresets,
     title: title ?? _title,
     nodeColor: nodeColor ?? this.nodeColor,
+    palette: palette ?? this.palette,
   );
 
   /// Value equality, so the editor can cache the panel widget against it and
@@ -131,7 +140,8 @@ class MinimapConfig {
           other.maxSize == maxSize &&
           listEquals(other._sizePresets, _sizePresets) &&
           other._title == _title &&
-          other.nodeColor == nodeColor;
+          other.nodeColor == nodeColor &&
+          other.palette == palette;
 
   @override
   int get hashCode => Object.hash(
@@ -142,5 +152,6 @@ class MinimapConfig {
     _sizePresets == null ? null : Object.hashAll(_sizePresets),
     _title,
     nodeColor,
+    palette,
   );
 }

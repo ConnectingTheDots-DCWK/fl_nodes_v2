@@ -96,10 +96,16 @@ class MinimapPanelState extends State<MinimapPanel> {
         !identical(old.connections, widget.connections) ||
         old.theme != widget.theme ||
         old.viewportSize != widget.viewportSize ||
-        old.config.nodeColor != widget.config.nodeColor) {
+        old.config.nodeColor != widget.config.nodeColor ||
+        old.config.palette != widget.config.palette) {
       _buildBody();
     }
   }
+
+  /// The host's, or the one that reads against this canvas.
+  MinimapPalette get _palette =>
+      widget.config.palette ??
+      MinimapPalette.forCanvas(widget.theme.background);
 
   void _buildBody() {
     _painter = MinimapPainter(
@@ -110,6 +116,7 @@ class MinimapPanelState extends State<MinimapPanel> {
       theme: widget.theme,
       viewportSize: widget.viewportSize,
       nodeColor: widget.config.nodeColor,
+      palette: _palette,
     );
     _body = RepaintBoundary(
       child: Stack(
@@ -119,7 +126,7 @@ class MinimapPanelState extends State<MinimapPanel> {
             right: 0,
             bottom: 0,
             child: _MinimapGrip(
-              color: MinimapPalette.forCanvas(widget.theme.background).edge,
+              color: _palette.edge,
               onStart: _onResizeStart,
               onUpdate: _onResizeUpdate,
             ),
@@ -245,7 +252,7 @@ class MinimapPanelState extends State<MinimapPanel> {
 
   Widget _build(BuildContext context, Widget? body) {
     final minimap = widget.minimap;
-    final palette = MinimapPalette.forCanvas(widget.theme.background);
+    final palette = _palette;
     final panel = _panelSize();
     final position = _resolvedPosition(panel);
     final height = minimap.minimised ? _barHeightOf(context) : panel.height;
