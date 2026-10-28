@@ -135,6 +135,7 @@ export 'src/menus/node_menu_entry.dart' show NodeMenuEntry, NodeMenuEntryId;
 export 'src/minimap/minimap_config.dart' show MinimapConfig, MinimapNodeColor;
 export 'src/minimap/minimap_controller.dart' show MinimapController;
 export 'src/minimap/minimap_painter.dart' show MinimapPainter;
+export 'src/minimap/minimap_palette.dart' show MinimapPalette;
 export 'src/minimap/minimap_projection.dart' show MinimapProjection;
 export 'src/minimap/minimap_scene.dart' show MinimapScene;
 export 'src/painting/connection_appearance.dart'

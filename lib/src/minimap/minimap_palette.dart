@@ -1,5 +1,7 @@
 import 'dart:ui' show Color;
 
+import 'package:flutter/foundation.dart' show immutable;
+
 /// The minimap's own chrome colours.
 ///
 /// Read off the canvas background rather than off `Theme.of`, exactly as
@@ -10,6 +12,11 @@ import 'dart:ui' show Color;
 /// Nothing here is added to `NodeEditorTheme`. The one thing the map takes
 /// from the theme is `selectionColor`, which it *must* share or the map lies
 /// about which node is selected.
+///
+/// A host with a palette of its own hands one to `MinimapConfig.palette`,
+/// and the panel uses it as it is, whatever the canvas behind it. Left out,
+/// the panel picks [onDark] or [onLight] by [forCanvas].
+@immutable
 class MinimapPalette {
   const MinimapPalette({
     required this.surface,
@@ -64,4 +71,41 @@ class MinimapPalette {
 
   static MinimapPalette forCanvas(Color background) =>
       background.computeLuminance() > 0.5 ? onLight : onDark;
+
+  MinimapPalette copyWith({
+    Color? surface,
+    Color? bar,
+    Color? ink,
+    Color? edge,
+    Color? shade,
+    Color? node,
+    Color? viewportBorder,
+  }) => MinimapPalette(
+    surface: surface ?? this.surface,
+    bar: bar ?? this.bar,
+    ink: ink ?? this.ink,
+    edge: edge ?? this.edge,
+    shade: shade ?? this.shade,
+    node: node ?? this.node,
+    viewportBorder: viewportBorder ?? this.viewportBorder,
+  );
+
+  /// Value equality, because `MinimapConfig` compares by value and carries
+  /// one: a host that builds the same palette on every rebuild must not
+  /// cost the editor its cached panel.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MinimapPalette &&
+          other.surface == surface &&
+          other.bar == bar &&
+          other.ink == ink &&
+          other.edge == edge &&
+          other.shade == shade &&
+          other.node == node &&
+          other.viewportBorder == viewportBorder;
+
+  @override
+  int get hashCode =>
+      Object.hash(surface, bar, ink, edge, shade, node, viewportBorder);
 }

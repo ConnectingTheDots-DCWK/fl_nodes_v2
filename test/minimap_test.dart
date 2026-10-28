@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 // Deliberately not exported: a host reaches the panel through
 // `NodeEditor.minimap`, and only these tests need the type itself.
-import 'package:fl_nodes_v2/src/minimap/minimap_palette.dart';
 import 'package:fl_nodes_v2/src/minimap/minimap_panel.dart';
 import 'package:fl_nodes_v2/src/minimap/minimap_projection.dart'
     show minimapNodeColor, minimapShadeBands;
@@ -340,6 +339,43 @@ void main() {
     await tester.pumpWidget(harness(controller));
     expect(panelFinder, findsOneWidget);
     expect(mapFinder, findsOneWidget);
+  });
+
+  testWidgets('a host palette replaces the canvas-derived one, and moves it '
+      'when it changes', (tester) async {
+    const ember = MinimapPalette(
+      surface: Color(0xFF241C17),
+      bar: Color(0xFF30251E),
+      ink: Color(0xFFF4E9DD),
+      edge: Color(0xFF4A3A2E),
+      shade: Color(0x8C120D0A),
+      node: Color(0xFFA08A78),
+      viewportBorder: Color(0xFFE8C9A8),
+    );
+    Color frame() => tester
+        .widget<Material>(find.byKey(const ValueKey<String>('minimap.frame')))
+        .color!;
+    MinimapPalette painted() =>
+        (tester.widget<CustomPaint>(mapFinder).painter! as MinimapPainter)
+            .palette;
+
+    final controller = boot();
+    await tester.pumpWidget(harness(controller));
+    expect(frame(), MinimapPalette.onDark.surface);
+    expect(painted(), MinimapPalette.onDark);
+
+    await tester.pumpWidget(
+      harness(controller, minimap: const MinimapConfig(palette: ember)),
+    );
+    expect(frame(), ember.surface);
+    expect(
+      painted(),
+      ember,
+      reason:
+          'the map is cached against the config, so a palette that '
+          'did not reach the painter would leave the old colours under '
+          'a new frame',
+    );
   });
 
   testWidgets('the panel starts where the config aligns it', (tester) async {

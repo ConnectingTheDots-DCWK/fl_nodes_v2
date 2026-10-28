@@ -3,6 +3,18 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## Unreleased
+
+### Added
+
+- **The minimap's colours are the host's to set.** `MinimapConfig.palette`
+  (null, the panel picks by the canvas background) takes a `MinimapPalette`
+  — the panel, its bar, the writing on it, its edge, the wash, a plain node
+  and the viewport frame — and the panel uses it as it is.
+- `MinimapPalette` is exported, with its two built-in palettes,
+  `MinimapPalette.onDark` and `MinimapPalette.onLight`, and `copyWith`, so a
+  host can start from one and change a colour.
+
 ## 1.4.0
 
 Level of detail: a board zoomed out far enough is drawn from sketches the

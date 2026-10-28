@@ -23,7 +23,8 @@ class MinimapPainter extends CustomPainter {
     required this.theme,
     required this.viewportSize,
     this.nodeColor,
-  }) : palette = MinimapPalette.forCanvas(theme.background),
+    MinimapPalette? palette,
+  }) : palette = palette ?? MinimapPalette.forCanvas(theme.background),
        // The one painter in this package with a `repaint` listenable, and the
        // reason it can have one is that every input it reads is on a
        // ChangeNotifier. The four canvas painters cannot: their inputs include
