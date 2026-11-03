@@ -43,6 +43,7 @@ class EmphasisPainter extends CustomPainter {
     required this.revision,
     required this.graph,
     this.appearance,
+    super.repaint,
   });
 
   final GraphEmphasis emphasis;

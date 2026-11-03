@@ -33,6 +33,7 @@ class ConnectionsPainter extends CustomPainter {
     this.labelStyle,
     this.definitions,
     this.appearance,
+    super.repaint,
   });
 
   final ConnectionLayout layout;

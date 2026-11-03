@@ -100,6 +100,7 @@ class NodeEditor extends StatefulWidget {
     this.onPortSecondaryTap,
     this.portTooltip,
     this.connectionAppearance,
+    this.connectionAppearanceRepaint,
     this.descriptionBuilder,
     this.onConnectionSecondaryTap,
     this.contextMenus = const NodeEditorMenus(),
@@ -193,6 +194,16 @@ class NodeEditor extends StatefulWidget {
   /// included, so keep it to a lookup. Pass the same function each build — a
   /// new closure repaints the wires, though it rebuilds nothing.
   final ConnectionAppearanceResolver? connectionAppearance;
+
+  /// Repaints the wires whenever it notifies, so [connectionAppearance] can
+  /// read state the host keeps outside the graph — a node that is running, a
+  /// branch nothing reaches — and be asked again when that state moves.
+  ///
+  /// The wires already repaint for every edit, hover and selection change;
+  /// this is for everything else. It repaints and rebuilds nothing, so it may
+  /// notify as often as the state changes. Null, the default, adds no
+  /// trigger.
+  final Listenable? connectionAppearanceRepaint;
 
   /// Renders a node's description in the "About this node" dialog, or null to
   /// show it as plain selectable text.
@@ -2174,6 +2185,7 @@ class NodeEditorState extends State<NodeEditor>
                       labelStyle: _labelStyle(),
                       definitions: _controller.definitions,
                       appearance: widget.connectionAppearance,
+                      repaint: widget.connectionAppearanceRepaint,
                     ),
                     size: size,
                   ),
@@ -2342,6 +2354,7 @@ class NodeEditorState extends State<NodeEditor>
             revision: _controller.revision,
             graph: _controller.graph,
             appearance: widget.connectionAppearance,
+            repaint: widget.connectionAppearanceRepaint,
           ),
         ),
       ),

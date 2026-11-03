@@ -568,6 +568,13 @@ fl_nodes had this as a per-port `linkStyleBuilder`, and v2 forgot it.
   memoised on the geometry, which is replaced when the curve moves.
   Screen-space dashes would be re-cut on every zoom. Below the detail zoom a
   dashed wire draws solid: the dashes would be a pixel long.
+- **State outside the graph repaints through `connectionAppearanceRepaint`**,
+  a `Listenable` handed to `ConnectionsPainter` and `EmphasisPainter` as
+  their `repaint`. It is an extra trigger beside `shouldRepaint`, not a
+  replacement for it — the hover and the marquee still arrive by rebuild,
+  which is why *Minimap* says these painters cannot rely on a listenable
+  alone. Before it, the only way to re-ask the resolver about a host's state
+  was a new closure, which the doc comment tells a host not to pass.
 - **The minimap and the pending wire ignore it.** The minimap is a panorama
   in one colour, and the pending wire has no far port and already uses its
   colour to say whether a drop is valid.
@@ -1044,10 +1051,12 @@ Two caches, and they are the whole performance story:
   (`_requestCanvasFocus`), never `() => _focusNode.requestFocus()` read per
   build — a closure is the one input that cannot compare equal to the last one,
   which is the same trap `_commentBuilder` documents.
-- **`MinimapPainter` takes a `repaint` listenable**, the only painter here that
-  does. It can because every input it reads is on a `ChangeNotifier`; the four
-  canvas painters cannot, because theirs include `NodeEditorState` fields — the
-  hovered port, the marquee, the pending wire — that only a rebuild delivers.
+- **`MinimapPainter` repaints from a listenable alone**, the only painter here
+  that does. It can because every input it reads is on a `ChangeNotifier`; the
+  four canvas painters cannot, because theirs include `NodeEditorState` fields
+  — the hovered port, the marquee, the pending wire — that only a rebuild
+  delivers. (The wires take `connectionAppearanceRepaint` as a *second*
+  trigger; see *A wire's look*.)
   Together the two mean a scroll tick repaints one layer and rebuilds nothing.
   Do not "tidy" the `repaint` away.
 

@@ -3,6 +3,17 @@
 What a host can do with each version, newest first. The reasoning behind a
 change lives beside the code in `CLAUDE.md`; this file only says what changed.
 
+## Unreleased
+
+### Added
+
+- `ConnectionDash.dashDot`, beside `.dashed` and `.dotted`: a dash, then a
+  dot.
+- **`NodeEditor.connectionAppearanceRepaint`** (null): a `Listenable` that
+  repaints the wires when it notifies, so `connectionAppearance` can answer
+  from the host's own state — a running node, an unreachable branch — and be
+  asked again when it changes. Repaints only; nothing is rebuilt.
+
 ## 1.5.0
 
 The minimap takes the host's colours.

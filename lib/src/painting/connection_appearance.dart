@@ -64,6 +64,9 @@ class ConnectionDash {
   /// Short strokes the round cap turns into dots.
   static const ConnectionDash dotted = ConnectionDash(<double>[0.5, 6]);
 
+  /// A dash, then a dot: [dashed]'s stroke and [dotted]'s, alternating.
+  static const ConnectionDash dashDot = ConnectionDash(<double>[8, 6, 0.5, 6]);
+
   final List<double> intervals;
 
   /// [path] cut into this pattern.
