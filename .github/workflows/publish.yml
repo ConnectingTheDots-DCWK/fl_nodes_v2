@@ -48,7 +48,7 @@ jobs:
       contents: write # the tag and the release
       actions: write # dispatching the publish run on the tag
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Read the package's name and version
         id: package
@@ -112,7 +112,7 @@ jobs:
           echo "::error::pub.dev only accepts a publish from a tag. Run this on the tag (Use workflow from → Tags), or turn createRelease on."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Refuse a tag that is not the pubspec's version
         run: |
