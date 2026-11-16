@@ -1,0 +1,14 @@
+# The workflows' actions, weekly and in one pull request, so a deprecation
+# (Node 20's, which this file arrived with) is a bump to review rather than a
+# warning in a run log.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["Department: CI/CD", "Type: Maintenance"]
+    groups:
+      actions:
+        patterns: ["*"]
