@@ -530,6 +530,21 @@ build, 1280x720: 13 ms of UI thread with 30 nodes in view, 66 ms with 72,
 `portMinScale`, where nothing is drawn, so the worst of it sat at the zooms a
 board is actually worked at. `port_lod_test.dart` holds a bound on it.
 
+**`NodeEditor.portShape` overrides the kind's shape per port, and it is a
+resolver rather than a field on `NodePort`** (#49). The ask was telling an
+input that takes several wires from one that takes one, which the kind cannot
+say — a wire joins two ports of one kind. A `shape` on `NodePort` would have
+entered `==` and the codec, which is the port description trap under *Hooks
+a host can hang on*: every document written before it differs from what its
+definition now builds, and an autosaving host rewrites files nobody touched. A resolver also
+covers a limit the host derives from the graph, which a stored field could not.
+It is asked once per handle per paint, the hovered one included so a handle
+keeps its shape while aimed at, and `PortsPainter` repaints when the function's
+identity changes, as the wires do for `connectionAppearance`. The two shapes
+added with it, `square` and `pill`, are sized by eye to the dot's area like
+the triangle, the pill a quarter taller than the dot at most so a mixed row
+still reads as one size.
+
 **`NodeEditor.portTooltip` is a callback and cannot be anything else.** A
 port's `dataType` is a tag the *host* chose — `numberList`, `assetList` — so
 the package printing it raw would show an author a spelling that appears
@@ -568,6 +583,13 @@ fl_nodes had this as a per-port `linkStyleBuilder`, and v2 forgot it.
   memoised on the geometry, which is replaced when the curve moves.
   Screen-space dashes would be re-cut on every zoom. Below the detail zoom a
   dashed wire draws solid: the dashes would be a pixel long.
+- **State outside the graph repaints through `connectionAppearanceRepaint`**,
+  a `Listenable` handed to `ConnectionsPainter` and `EmphasisPainter` as
+  their `repaint`. It is an extra trigger beside `shouldRepaint`, not a
+  replacement for it — the hover and the marquee still arrive by rebuild,
+  which is why *Minimap* says these painters cannot rely on a listenable
+  alone. Before it, the only way to re-ask the resolver about a host's state
+  was a new closure, which the doc comment tells a host not to pass.
 - **The minimap and the pending wire ignore it.** The minimap is a panorama
   in one colour, and the pending wire has no far port and already uses its
   colour to say whether a drop is valid.
@@ -1044,10 +1066,12 @@ Two caches, and they are the whole performance story:
   (`_requestCanvasFocus`), never `() => _focusNode.requestFocus()` read per
   build — a closure is the one input that cannot compare equal to the last one,
   which is the same trap `_commentBuilder` documents.
-- **`MinimapPainter` takes a `repaint` listenable**, the only painter here that
-  does. It can because every input it reads is on a `ChangeNotifier`; the four
-  canvas painters cannot, because theirs include `NodeEditorState` fields — the
-  hovered port, the marquee, the pending wire — that only a rebuild delivers.
+- **`MinimapPainter` repaints from a listenable alone**, the only painter here
+  that does. It can because every input it reads is on a `ChangeNotifier`; the
+  four canvas painters cannot, because theirs include `NodeEditorState` fields
+  — the hovered port, the marquee, the pending wire — that only a rebuild
+  delivers. (The wires take `connectionAppearanceRepaint` as a *second*
+  trigger; see *A wire's look*.)
   Together the two mean a scroll tick repaints one layer and rebuilds nothing.
   Do not "tidy" the `repaint` away.
 

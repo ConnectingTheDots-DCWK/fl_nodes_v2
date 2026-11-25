@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:fl_nodes_v2/fl_nodes_v2.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -75,6 +77,86 @@ void main() {
             'the tip is the rightmost point and the flat back is behind it, '
             'so an input and an output both read left to right',
       );
+    });
+  });
+
+  group('a shape per port', () {
+    // One handle, large, in the middle of a 100-unit square, so a pixel
+    // inside a square's corner and outside the circle tells the two apart.
+    final theme = NodeEditorTheme.dark().copyWith(portRadius: 12);
+    const node = GraphNode(
+      id: 'n',
+      position: Offset.zero,
+      width: 100,
+      height: 100,
+      ports: <NodePort>[NodePort.input(id: 'many', anchor: Offset(0.5, 0.5))],
+    );
+
+    PortsPainter painter({PortShapeResolver? shapeOf}) => PortsPainter(
+      nodes: const <GraphNode>[node],
+      sizeOf: (_) => const Size(100, 100),
+      connectedPorts: const <String, Set<String>>{
+        'n': <String>{'many'},
+      },
+      viewport: ViewportTransform.identity,
+      theme: theme,
+      revision: 0,
+      selectionRevision: 0,
+      coversOf: (_) => const <Rect>[],
+      shapeOf: shapeOf,
+    );
+
+    /// The alpha of the pixel just inside the square's corner, at offsets of
+    /// nine to ten from the anchor on both axes: past the circle of radius
+    /// twelve, within the square of half-side ten and a half.
+    Future<int> cornerAlpha(WidgetTester tester, PortsPainter painter) async {
+      final recorder = ui.PictureRecorder();
+      painter.paint(Canvas(recorder), const Size(100, 100));
+      final picture = recorder.endRecording();
+      final alpha = await tester.runAsync(() async {
+        final image = await picture.toImage(100, 100);
+        final bytes = await image.toByteData();
+        image.dispose();
+        return bytes!.getUint8((59 * 100 + 59) * 4 + 3);
+      });
+      picture.dispose();
+      return alpha!;
+    }
+
+    testWidgets("the host's answer is what is drawn, and none is the theme's", (
+      tester,
+    ) async {
+      final asked = <(String, String)>[];
+      final square = painter(
+        shapeOf: (node, port) {
+          asked.add((node.id, port.id));
+          return PortShape.square;
+        },
+      );
+      expect(await cornerAlpha(tester, square), greaterThan(200));
+      expect(asked, <(String, String)>[('n', 'many')]);
+
+      expect(
+        await cornerAlpha(tester, painter(shapeOf: (_, _) => null)),
+        0,
+        reason: "null leaves the theme's dot for a data port",
+      );
+      expect(await cornerAlpha(tester, painter()), 0);
+    });
+
+    test('a new resolver repaints the handles', () {
+      PortShape? square(GraphNode node, NodePort port) => PortShape.square;
+      final before = painter(shapeOf: square);
+      expect(painter(shapeOf: square).shouldRepaint(before), isFalse);
+      expect(
+        painter(shapeOf: (_, _) => PortShape.pill).shouldRepaint(before),
+        isTrue,
+      );
+    });
+
+    test('a pill stands upright', () {
+      final bounds = PortShape.pill.path(Offset.zero, 6).getBounds();
+      expect(bounds.height, greaterThan(bounds.width * 1.5));
     });
   });
 

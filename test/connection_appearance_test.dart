@@ -40,6 +40,7 @@ void main() {
   Widget harness(
     NodeEditorController controller, {
     ConnectionAppearanceResolver? appearance,
+    Listenable? repaint,
   }) => MaterialApp(
     home: Scaffold(
       body: Align(
@@ -51,6 +52,7 @@ void main() {
             controller: controller,
             theme: NodeEditorTheme.dark(),
             connectionAppearance: appearance,
+            connectionAppearanceRepaint: repaint,
             nodeBuilder: (context, graphNode, state) =>
                 const ColoredBox(color: Color(0xFF2A2E38)),
           ),
@@ -159,6 +161,44 @@ void main() {
     await tester.pump();
 
     expect(layerOf<EmphasisPainter>(), paints..path(color: _number));
+  });
+
+  testWidgets('state the host keeps outside the graph repaints the wires, '
+      'below the scrim and above it', (tester) async {
+    final controller = wired();
+    final running = ValueNotifier<bool>(false);
+    addTearDown(running.dispose);
+    // One resolver for the whole test: a new closure would repaint on its
+    // own and prove nothing about the listenable.
+    ConnectionAppearance resolve(
+      NodeConnection connection,
+      NodePort from,
+      NodePort to,
+    ) => ConnectionAppearance(color: running.value ? _text : _number);
+    await tester.pumpWidget(
+      harness(controller, appearance: resolve, repaint: running),
+    );
+    // Asked of the layer rather than of `paints`, which calls `paint` itself
+    // and so sees the new answer whether or not anything asked for a frame.
+    bool marked<T extends CustomPainter>() =>
+        tester.renderObject(layerOf<T>()).debugNeedsPaint;
+
+    running.value = true;
+    expect(marked<ConnectionsPainter>(), isTrue);
+    await tester.pump();
+    expect(layerOf<ConnectionsPainter>(), paints..path(color: _text));
+
+    controller.emphasis.value = const GraphEmphasis(
+      nodes: <String, Color?>{'a': null, 'b': null},
+      connections: <String, Color?>{'c1': null},
+    );
+    await tester.pump();
+    running.value = false;
+    expect(
+      marked<EmphasisPainter>(),
+      isTrue,
+      reason: 'a lifted wire must change with the one under the scrim',
+    );
   });
 
   group('a dash pattern', () {

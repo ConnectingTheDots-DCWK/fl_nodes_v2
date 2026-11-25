@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import '../geometry/node_geometry.dart';
 import '../geometry/viewport_transform.dart';
 import '../model/graph_node.dart';
+import '../model/node_port.dart';
 import '../model/port_ref.dart';
 import '../theme/node_editor_theme.dart';
 import 'port_shape.dart';
@@ -39,6 +40,7 @@ class PortsPainter extends CustomPainter {
     this.hovered,
     this.highlighted,
     this.lifted,
+    this.shapeOf,
   });
 
   /// The nodes currently drawn, already culled by the editor.
@@ -84,6 +86,12 @@ class PortsPainter extends CustomPainter {
   /// it compares [connectedPorts].
   final Set<String>? lifted;
 
+  /// [NodeEditor.portShape]: the host's shape for a port, where it gives one.
+  final PortShapeResolver? shapeOf;
+
+  PortShape _shapeOf(GraphNode node, NodePort port) =>
+      shapeOf?.call(node, port) ?? theme.shapeOf(port.kind);
+
   @override
   void paint(Canvas canvas, Size size) {
     if (viewport.scale < theme.portMinScale) return;
@@ -114,15 +122,17 @@ class PortsPainter extends CustomPainter {
         final centre = NodeGeometry.portPosition(node, port, nodeSize);
         final base = port.color ?? theme.portColor;
         final ref = PortRef(node.id, port.id);
+        // Asked once per handle, for the hovered one too, so the handle
+        // being aimed at keeps the shape it had a moment ago.
+        final shape = _shapeOf(node, port);
         if (ref == hovered || ref == highlighted) {
-          active.add((centre, theme.shapeOf(port.kind), covers));
+          active.add((centre, shape, covers));
           continue;
         }
         final filled = connected?.contains(port.id) ?? false;
         // Every shape is built on the same circumradius, so a row of mixed
         // shapes lines up and the hit target stays one rule for all of them
         // (`NodeEditorLayout.portAt` is still a radius).
-        final shape = theme.shapeOf(port.kind);
         into.add(
           fill: filled ? base : theme.background,
           stroke: base,
@@ -184,7 +194,8 @@ class PortsPainter extends CustomPainter {
       oldDelegate.highlighted != highlighted ||
       oldDelegate.selectionRevision != selectionRevision ||
       !identical(oldDelegate.connectedPorts, connectedPorts) ||
-      !identical(oldDelegate.lifted, lifted);
+      !identical(oldDelegate.lifted, lifted) ||
+      !identical(oldDelegate.shapeOf, shapeOf);
 }
 
 /// Handle fills and outlines, merged into one path per colour.

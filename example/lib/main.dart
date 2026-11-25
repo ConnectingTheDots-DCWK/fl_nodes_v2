@@ -86,6 +86,9 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
   bool _createOnDrop = false;
   bool _showMinimap = true;
 
+  /// Whether a data input that takes several wires is drawn as a pill.
+  bool _markManyInputs = true;
+
   /// Owned here rather than left to the editor, so the panel comes back where
   /// it was left when the minimap is switched off and on again.
   final MinimapController _minimap = MinimapController();
@@ -445,6 +448,9 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
       minimapController: _minimap,
       onNodeDoubleTap: _renameNode,
       connectionAppearance: _wireLook,
+      // A top-level function, so the editor is handed the same one each
+      // build and the handles repaint only when the toggle flips.
+      portShape: _markManyInputs ? _inputShape : null,
     );
   }
 
@@ -696,6 +702,12 @@ class _WorkflowEditorPageState extends State<WorkflowEditorPage> {
               onChanged: (value) => setState(() => _showMinimap = value),
             ),
             _Toggle(
+              icon: Icons.linear_scale,
+              tooltip: 'Inputs that take several wires are pills',
+              value: _markManyInputs,
+              onChanged: (value) => setState(() => _markManyInputs = value),
+            ),
+            _Toggle(
               icon: Icons.turn_right,
               tooltip: 'Right-angled links',
               value: _linkStyle == ConnectionStyle.orthogonal,
@@ -807,6 +819,15 @@ class _StatusChip extends StatelessWidget {
 /// Data wires dashed, control wires solid, so the flow reads apart from what
 /// it carries. Top-level rather than a closure in `_buildEditor`: a new
 /// function every build would repaint every wire every build.
+/// A data input that takes more than one wire is a pill, so it can be told
+/// from one that takes a single wire before anything is dropped on it. Control
+/// inputs keep the theme's triangle: every one of them here takes several, and
+/// the shape is saying which way the flow runs.
+PortShape? _inputShape(GraphNode node, NodePort port) =>
+    port.isInput && port.kind == PortKind.data && port.maxConnections != 1
+    ? PortShape.pill
+    : null;
+
 ConnectionAppearance? _wireLook(
   NodeConnection connection,
   NodePort from,
