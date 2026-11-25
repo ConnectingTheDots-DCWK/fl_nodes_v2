@@ -235,9 +235,24 @@ the theme and `NodePort.color`.
 
 A handle's **shape** is the theme's too, one per kind:
 `controlPortShape` and `dataPortShape` pick from `PortShape.circle`,
-`triangle` and `diamond`, so a control pin and a data pin can be told apart
-without tracing a wire. The default pairs a triangle with a dot; set both to
-`circle` for the row of identical dots this package drew before 0.5.0.
+`triangle`, `diamond`, `square` and `pill`, so a control pin and a data pin
+can be told apart without tracing a wire. The default pairs a triangle with a
+dot; set both to `circle` for the row of identical dots this package drew
+before 0.5.0.
+
+`NodeEditor.portShape` overrides the theme for the ports you name — say, an
+input that takes several wires beside inputs that take one, which a kind
+cannot express because a wire joins two ports of the same kind. It is asked at
+paint time, so the answer can follow from the graph; null keeps the theme's:
+
+```dart
+// maxConnections is null (unlimited) unless a port sets it.
+portShape: (node, port) =>
+    port.isInput && port.maxConnections != 1 ? PortShape.pill : null,
+```
+
+The shape is only what is drawn: every handle is picked within the same
+radius, whatever it looks like.
 
 `NodeEditor.portTooltip` labels the handle the pointer rests on. It is asked
 of the host rather than worked out here, because a `dataType` is a tag the

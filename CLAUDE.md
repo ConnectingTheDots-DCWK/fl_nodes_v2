@@ -530,6 +530,21 @@ build, 1280x720: 13 ms of UI thread with 30 nodes in view, 66 ms with 72,
 `portMinScale`, where nothing is drawn, so the worst of it sat at the zooms a
 board is actually worked at. `port_lod_test.dart` holds a bound on it.
 
+**`NodeEditor.portShape` overrides the kind's shape per port, and it is a
+resolver rather than a field on `NodePort`** (#49). The ask was telling an
+input that takes several wires from one that takes one, which the kind cannot
+say — a wire joins two ports of one kind. A `shape` on `NodePort` would have
+entered `==` and the codec, which is the port description trap under *Hooks
+a host can hang on*: every document written before it differs from what its
+definition now builds, and an autosaving host rewrites files nobody touched. A resolver also
+covers a limit the host derives from the graph, which a stored field could not.
+It is asked once per handle per paint, the hovered one included so a handle
+keeps its shape while aimed at, and `PortsPainter` repaints when the function's
+identity changes, as the wires do for `connectionAppearance`. The two shapes
+added with it, `square` and `pill`, are sized by eye to the dot's area like
+the triangle, the pill a quarter taller than the dot at most so a mixed row
+still reads as one size.
+
 **`NodeEditor.portTooltip` is a callback and cannot be anything else.** A
 port's `dataType` is a tag the *host* chose — `numberList`, `assetList` — so
 the package printing it raw would show an author a spelling that appears

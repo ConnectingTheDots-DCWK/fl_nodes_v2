@@ -13,6 +13,12 @@ change lives beside the code in `CLAUDE.md`; this file only says what changed.
   repaints the wires when it notifies, so `connectionAppearance` can answer
   from the host's own state — a running node, an unreachable branch — and be
   asked again when it changes. Repaints only; nothing is rebuilt.
+- **`NodeEditor.portShape`** (null): a `PortShapeResolver` that gives one
+  port's handle a shape of its own, or null for the theme's by its kind — so
+  an input that takes several wires can look different from one that takes
+  a single wire. Asked at paint time; picking is unchanged.
+- `PortShape.square` and `PortShape.pill`, an upright capsule, beside
+  `.circle`, `.triangle` and `.diamond`.
 
 ## 1.5.0
 

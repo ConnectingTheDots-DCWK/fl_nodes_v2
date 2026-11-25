@@ -27,6 +27,7 @@ import '../painting/grid_painter.dart';
 import '../painting/grid_shader.dart';
 import '../painting/node_sketch.dart';
 import '../painting/overlay_painter.dart';
+import '../painting/port_shape.dart';
 import '../painting/ports_painter.dart';
 import '../painting/sketch_cache.dart';
 import '../painting/sketch_painter.dart';
@@ -99,6 +100,7 @@ class NodeEditor extends StatefulWidget {
     this.onCanvasSecondaryTap,
     this.onPortSecondaryTap,
     this.portTooltip,
+    this.portShape,
     this.connectionAppearance,
     this.connectionAppearanceRepaint,
     this.descriptionBuilder,
@@ -171,6 +173,30 @@ class NodeEditor extends StatefulWidget {
   /// so a host can label the ports worth labelling and leave the obvious ones
   /// alone.
   final String? Function(GraphNode node, NodePort port)? portTooltip;
+
+  /// The shape a port's handle is drawn as, or null for the theme's —
+  /// [NodeEditorTheme.controlPortShape] or [NodeEditorTheme.dataPortShape]
+  /// by its kind.
+  ///
+  /// For the ports a host wants told apart from others of their kind, where
+  /// the kind cannot do it: a wire joins two ports of one kind, so a data
+  /// input that takes several wires has to stay a data port and look like
+  /// something else. The usual answer reads the port's limit:
+  ///
+  /// ```dart
+  /// portShape: (node, port) =>
+  ///     port.isInput && port.maxConnections != 1 ? PortShape.pill : null,
+  /// ```
+  ///
+  /// Asked at paint time, so the answer may follow from the graph — a limit
+  /// the host derives from what is wired — and is never stored in the
+  /// document. It decides only what is drawn: picking stays a radius about
+  /// the anchor, so every shape is grabbed the same way.
+  ///
+  /// It is called for every handle on screen on every repaint, panning
+  /// included, so keep it to a lookup. Pass the same function each build — a
+  /// new closure repaints the handles, though it rebuilds nothing.
+  final PortShapeResolver? portShape;
 
   /// How each wire is drawn — its colour, width and dash — or null for the
   /// theme's.
@@ -2240,6 +2266,7 @@ class NodeEditorState extends State<NodeEditor>
                         // included, so a dimmed card would otherwise keep a
                         // row of bright dots floating over the wash.
                         lifted: _controller.emphasis.lifted,
+                        shapeOf: widget.portShape,
                       ),
                       size: size,
                     ),

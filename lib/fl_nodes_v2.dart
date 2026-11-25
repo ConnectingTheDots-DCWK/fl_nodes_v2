@@ -156,7 +156,7 @@ export 'src/painting/node_sketch.dart'
         SketchPart,
         SketchText;
 export 'src/painting/grid_painter.dart' show GridPainter;
-export 'src/painting/port_shape.dart' show PortShape;
+export 'src/painting/port_shape.dart' show PortShape, PortShapeResolver;
 export 'src/painting/grid_shader.dart' show GridShader;
 export 'src/painting/ports_painter.dart' show PortsPainter;
 export 'src/painting/overlay_painter.dart'

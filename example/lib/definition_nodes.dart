@@ -98,6 +98,9 @@ final NodeDefinition formatDefinition = NodeDefinition(
               // trick the condition card uses, except the row count now
               // follows the text instead of being fixed at construction.
               anchor: Offset(0, CardMetrics.formatArgAnchorY(i, slots.length)),
+              // A slot holds one value, so it takes one wire — drawn as a
+              // dot, beside the pill of an input that takes several.
+              maxConnections: 1,
             ),
         ];
       },
